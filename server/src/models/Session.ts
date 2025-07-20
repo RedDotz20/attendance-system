@@ -1,13 +1,10 @@
-import * as mongoose from "mongoose";
+import mongoose from 'mongoose'
 
-const SessionSchema = new mongoose.Schema({
-	sid: { type: String, unique: true },
-	data: { type: Object, default: {} },
-	createdAt: { type: Date, default: Date.now },
-	expiresAt: { type: Date },
-});
+const sessionSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  sessionId: { type: String, required: true, unique: true },
+  createdAt: { type: Date, default: Date.now },
+  expiresAt: { type: Date, required: true }
+})
 
-SessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
-export const Session =
-	mongoose.models?.Session || mongoose.model("Session", SessionSchema);
+export const Session = mongoose.model('Session', sessionSchema)

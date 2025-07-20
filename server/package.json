@@ -7,15 +7,16 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@hono/node-server": "^1.14.4",
-    "dotenv": "^16.5.0",
-    "hono": "^4.8.2",
-    "mongoose": "^8.16.0",
+    "@hono/node-server": "^1.17.0",
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^17.2.0",
+    "hono": "^4.8.5",
+    "mongoose": "^8.16.4",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@types/node": "^20.11.17",
-    "tsx": "^4.7.1",
+    "@types/node": "^24.0.15",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }
 }
