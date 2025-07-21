@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import { Log } from "../models/Log.js";
+import { Log } from "../models/log.model.js";
 
 export const loggingMiddleware: MiddlewareHandler = async (c, next) => {
 	await next();

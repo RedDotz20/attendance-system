@@ -1,4 +1,4 @@
-import { Session } from "../models/Session.js";
+import { Session } from "../models/session.model.js";
 import crypto from "crypto";
 
 export async function createSession(userId: string) {
