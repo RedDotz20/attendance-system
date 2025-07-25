@@ -1,6 +1,7 @@
 import { cors } from "hono/cors";
+import { env } from "@/shared/config/env.js";
 
-const frontendOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:3001";
+const frontendOrigin = env.FRONTEND_ORIGIN || "http://localhost:3001";
 
 export const corsMiddleware = cors({
 	origin: frontendOrigin,

@@ -1,18 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions } from "@tanstack/react-query";
+import { fetchAuthQuery } from "@/features/auth/api/authQuery";
 
-export function useAuthQuery() {
-	return useQuery({
-		queryKey: ["auth", "me"],
-		queryFn: async () => {
-			const res = await fetch("http://localhost:3000/auth/me", {
-				credentials: "include",
-			});
-
-			if (!res.ok) throw new Error("Unauthorized");
-			const data = await res.json();
-			return data.user;
-		},
-		retry: false,
-		staleTime: 1000 * 60 * 5, // cache for 5 min
-	});
-}
+export const authQuery = queryOptions({
+	queryKey: ["auth", "me"],
+	queryFn: fetchAuthQuery,
+	staleTime: 1000 * 60 * 10, // Cache for 10 minutes
+	refetchOnWindowFocus: false, // Do not refetch when window gains focus
+	retry: false, // Do not retry if unauthorized
+});

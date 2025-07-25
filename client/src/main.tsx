@@ -29,11 +29,7 @@ const router = createRouter({
 		</div>
 	),
 	defaultNotFoundComponent: NotFound,
-	defaultErrorComponent: ({ error }: { error: unknown }) => (
-		<ErrorComponent
-			error={error instanceof Error ? error : new Error(String(error))}
-		/>
-	),
+	defaultErrorComponent: ({ error }) => <ErrorComponent error={error} />,
 });
 
 // Register the router instance for type safety

@@ -19,10 +19,13 @@ export const SignUpController = async (c: Context) => {
 	const parsed = SignUpSchema.safeParse(body);
 
 	if (!parsed.success) {
+		const { fieldErrors, formErrors } = z.flattenError(parsed.error);
 		return c.json(
 			{
 				message: "Validation Failed",
-				errors: parsed.error.flatten().fieldErrors,
+				errors: fieldErrors,
+				// Optionally include any form-wide errors:
+				...(formErrors.length > 0 ? { formErrors } : {}),
 			},
 			400
 		);
@@ -83,8 +86,8 @@ export const SignInController = async (c: Context) => {
 	}
 
 	const { email, password } = parsed.data;
-
 	const user = await User.findOne({ email });
+
 	if (!user || !(await bcrypt.compare(password, user.password))) {
 		return c.json(
 			{

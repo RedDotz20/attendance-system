@@ -1,7 +1,7 @@
 // src/shared/middleware/error-handler.ts
 import type { Context } from "hono";
 import type { ApiResponse } from "../types/common.js";
-import { logger } from "../utils/logger.js";
+import { logger } from "@/shared/utils/logger.js";
 
 export const errorHandler = async (err: Error, c: Context) => {
 	logger.error("Unhandled API Error", err, { path: c.req.path });

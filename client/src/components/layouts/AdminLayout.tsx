@@ -1,12 +1,13 @@
 import { Outlet, Navigate } from "@tanstack/react-router";
-import { useAuthQuery } from "@/hooks/useAuthQuery";
+import { authQuery } from "@/hooks/useAuthQuery";
+import { useQuery } from "@tanstack/react-query";
 
 export function AdminLayout() {
-	const { data: user, isLoading, isError } = useAuthQuery();
-
+	const { data, isLoading, isError } = useQuery(authQuery);
+	console.log("AUTH LAYOUT: ", data?.authenticated);
 	if (isLoading) return <div>Loading session...</div>;
-	if (isError || !user) return <Navigate to="/sign-in" />;
-	if (user.role !== "admin") return <Navigate to="/401" />;
+	if (isError || data?.user) return <Navigate to="/auth" />;
+	if (data?.user.role !== "admin") return <Navigate to="/401" />;
 
 	return <Outlet />;
 }

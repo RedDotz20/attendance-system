@@ -17,17 +17,17 @@ import {
 
 const app = new Hono<{ Variables: HonoVariables }>();
 
+app.use("*", corsMiddleware);
+
 app.use(secureHeaders());
-app.use(csrf());
+// app.use(csrf());
 app.use(logger());
 
 // connect mongodb database
 await connectDB();
 
-app.use("*", corsMiddleware);
-
 // use Rate Limit
-app.use("/health/*", upstashRateLimit);
+// app.use("/health/*", upstashRateLimit);
 
 app.route("/auth", auth);
 

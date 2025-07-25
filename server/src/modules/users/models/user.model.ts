@@ -1,12 +1,11 @@
 import mongoose, { Document, Schema } from "mongoose";
-
-export type Role = "admin" | "user";
+import type { Role as RoleType } from "@/modules/users/types/user.type.js";
 
 export interface IUser extends Document {
 	name?: string;
 	email: string;
 	password: string;
-	role: Role;
+	role: RoleType;
 	createdAt?: Date;
 	updatedAt?: Date;
 }
