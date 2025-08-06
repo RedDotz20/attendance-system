@@ -1,9 +1,10 @@
-import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
+import { StrictMode } from "react";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { AxiosError } from "axios";
 import { handleServerError } from "@/utils/handle-server-error.ts";
 import toast from "react-hot-toast";
+import LoadingPage from "@/components/LoadingPage.tsx";
 
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";
@@ -14,7 +15,6 @@ import {
 	QueryClientProvider,
 	QueryCache,
 } from "@tanstack/react-query";
-import { Loader2Icon } from "lucide-react";
 import { NotFound } from "@/components/NotFound.tsx";
 import { ErrorComponent } from "@/components/ErrorComponent.tsx";
 import "./styles.css";
@@ -78,12 +78,7 @@ const router = createRouter({
 	scrollRestoration: true,
 	defaultStructuralSharing: true,
 	defaultPreloadStaleTime: 0,
-	defaultPendingComponent: () => (
-		<div className="mx-auto mt-8 flex flex-col items-center justify-center">
-			<Loader2Icon className="animate-spin" />
-			<p className="mt-2 text-sm text-muted-foreground">Loading...</p>
-		</div>
-	),
+	defaultPendingComponent: LoadingPage,
 	defaultNotFoundComponent: NotFound,
 	defaultErrorComponent: ({ error }) => <ErrorComponent error={error} />,
 });

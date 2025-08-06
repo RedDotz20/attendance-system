@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { logger } from "@/shared/utils/logger.js";
-import "dotenv/config";
 import { env } from "./env.js";
+import "dotenv/config";
 
 export const connectDB = async (): Promise<void> => {
 	const startTime = Date.now();

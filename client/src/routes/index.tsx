@@ -1,17 +1,19 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
-import { authQuery } from "@/features/auth/api/authQuery";
+// import { useQuery } from "@tanstack/react-query";
+// import { authQuery } from "@/features/auth/api/mutations";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 
 export const Route = createFileRoute("/")({
 	component: App,
 });
 
 function App() {
-	const { data: auth } = useQuery(authQuery);
+	const { isAuthenticated } = useAuth();
 	const navigate = useNavigate();
+
 	const redirectLogin = () => {
-		if (!auth?.authenticated) {
+		if (!isAuthenticated) {
 			return navigate({ to: "/auth" });
 		} else {
 			return navigate({ to: "/dashboard" });
@@ -26,7 +28,7 @@ function App() {
 					variant="secondary"
 					onClick={redirectLogin}
 				>
-					{!auth?.authenticated ? "Login" : "Go To Dashboard"}
+					{!isAuthenticated ? "Login" : "Go To Dashboard"}
 				</Button>
 			</header>
 		</div>

@@ -1,17 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { redirect } from "@tanstack/react-router";
-import { authQuery } from "@/features/auth/api/authQuery";
+import { authQuery } from "@/features/auth/api/queries";
 import AuthPage from "@/features/auth";
 
 export const Route = createFileRoute("/(auth)/auth")({
 	beforeLoad: async ({ context }) => {
-		const authData = await context.queryClient.fetchQuery(authQuery);
+		const { isAuthenticated } = await context.queryClient.fetchQuery(authQuery);
 
-		if (authData.authenticated) {
+		if (isAuthenticated) {
 			throw redirect({ to: "/dashboard", search: { redirect: true } });
 		}
-
-		return authData;
 	},
 	component: AuthPage,
 });

@@ -1,10 +1,9 @@
 import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
-import { type QueryClient } from "@tanstack/react-query";
 import { ErrorComponent } from "@/components/ErrorComponent";
-import { authQuery } from "@/features/auth/api/authQuery";
+import { authQuery } from "@/features/auth/api/queries";
 import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "@/components/ThemeProvider";
-// import Header from "../components/Header";
+import { type QueryClient } from "@tanstack/react-query";
 
 import {
 	ReactQueryDevtools,
@@ -19,9 +18,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 	beforeLoad: async ({ context }) => {
 		try {
 			// Prefetch auth data for better UX, but don't redirect here
-			const authData = await context.queryClient.fetchQuery(authQuery);
-			console.log("Auth data in root:", authData);
-			return authData;
+			return await context.queryClient.fetchQuery(authQuery);
 		} catch (error) {
 			console.error("Auth fetch failed in root:", error);
 			// Return a default state for unauthenticated users

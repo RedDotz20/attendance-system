@@ -1,11 +1,9 @@
 import { Hono } from "hono";
 
-import {
-	GetSessionUserController,
-	LogOutController,
-	SignInController,
-	SignUpController,
-} from "@/modules/auth/controller/auth.controller.js";
+import { SignUpController } from "../controller/sign-up.controller.js";
+import { SignInController } from "../controller/sign-in.controller.js";
+import { GetSessionUserController } from "../controller/get-session.controller.js";
+import { SignOutController } from "../controller/sign-out.controller.js";
 
 export const auth = new Hono();
 
@@ -14,4 +12,4 @@ auth.post("/signin", SignInController);
 
 auth.get("/me", GetSessionUserController);
 
-auth.post("/logout", LogOutController);
+auth.post("/logout", SignOutController);

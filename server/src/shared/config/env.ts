@@ -11,6 +11,6 @@ export const env = loadEnv({
 		PORT: "3000",
 		NODE_ENV: "development",
 		DEBUG: "true",
-		FRONTEND_ORIGIN: "http://localhost:3001/",
+		FRONTEND_ORIGIN: "http://localhost:3001",
 	},
 });

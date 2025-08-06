@@ -10,15 +10,12 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { useNavigate } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
 import { Eye, EyeClosed } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "./hooks/useAuth";
 
-export default function AuthPage() {
-	const navigate = useNavigate();
-	const queryClient = useQueryClient();
+export default function AuthenticationPage() {
+	const { signIn } = useAuth();
 
 	const [form, setForm] = useState({
 		email: "",
@@ -38,41 +35,6 @@ export default function AuthPage() {
 			}));
 		}
 	}, []);
-
-	const signInMutation = useMutation({
-		mutationFn: async ({
-			email,
-			password,
-		}: {
-			email: string;
-			password: string;
-		}) => {
-			const res = await fetch("http://localhost:3000/auth/signin", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				credentials: "include",
-				body: JSON.stringify({ email, password }),
-			});
-			if (!res.ok) throw new Error("Invalid credentials");
-			return res.json();
-		},
-		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-			toast.success("Login Success");
-			if (form.rememberMe) {
-				localStorage.setItem("rememberedEmail", form.email);
-			} else {
-				localStorage.removeItem("rememberedEmail");
-			}
-			navigate({ to: "/dashboard" });
-		},
-		onError: (err: any) => {
-			console.error(err.message);
-			toast.error(err.message, {
-				style: { border: "2px solid red" },
-			});
-		},
-	});
 
 	const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
 		const { name, value, type, checked } = e.target;
@@ -96,15 +58,21 @@ export default function AuthPage() {
 		}));
 	}, []);
 
-	const handleSignIn = useCallback(
+	const handleSubmit = useCallback(
 		(event: React.FormEvent<HTMLFormElement>) => {
 			event.preventDefault();
-			signInMutation.mutate({
+			signIn.mutate({
 				email: form.email,
 				password: form.password,
 			});
+
+			if (form.rememberMe) {
+				localStorage.setItem("rememberedEmail", form.email);
+			} else {
+				localStorage.removeItem("rememberedEmail");
+			}
 		},
-		[form.email, form.password, signInMutation]
+		[form.email, form.password]
 	);
 
 	return (
@@ -121,7 +89,7 @@ export default function AuthPage() {
 				<CardContent className="space-y-4">
 					<form
 						className="space-y-4"
-						onSubmit={handleSignIn}
+						onSubmit={handleSubmit}
 						autoComplete="on"
 					>
 						<div className="space-y-2">
@@ -134,7 +102,7 @@ export default function AuthPage() {
 								required
 								value={form.email}
 								onChange={handleChange}
-								disabled={signInMutation.isPending}
+								disabled={signIn.isPending}
 								autoFocus
 								autoComplete="email"
 							/>
@@ -150,7 +118,7 @@ export default function AuthPage() {
 									value={form.password}
 									className="pr-16"
 									onChange={handleChange}
-									disabled={signInMutation.isPending}
+									disabled={signIn.isPending}
 									autoComplete="current-password" // Added for autofill
 								/>
 								<Button
@@ -162,7 +130,7 @@ export default function AuthPage() {
 									aria-label={
 										form.showPassword ? "Hide password" : "Show password"
 									}
-									disabled={signInMutation.isPending}
+									disabled={signIn.isPending}
 								>
 									{form.showPassword ? <EyeClosed /> : <Eye />}
 								</Button>
@@ -174,7 +142,7 @@ export default function AuthPage() {
 									id="remember"
 									checked={form.rememberMe}
 									onCheckedChange={handleRememberMe}
-									disabled={signInMutation.isPending}
+									disabled={signIn.isPending}
 								/>
 								<Label
 									htmlFor="remember"
@@ -193,17 +161,17 @@ export default function AuthPage() {
 						<Button
 							type="submit"
 							className="w-full"
-							disabled={signInMutation.isPending}
+							disabled={signIn.isPending}
 						>
-							{signInMutation.isPending ? "Signing In..." : "Sign in"}
+							{signIn.isPending ? "Signing In..." : "Sign in"}
 						</Button>
-						{signInMutation.isError && (
+						{signIn.isError && (
 							<div
 								className="text-red-600 text-sm mt-2"
 								aria-live="polite"
 								role="alert"
 							>
-								{signInMutation.error?.message || "Login failed"}
+								{signIn.error?.message || "Login failed"}
 							</div>
 						)}
 					</form>
