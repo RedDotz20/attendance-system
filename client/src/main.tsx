@@ -15,7 +15,8 @@ import {
 	QueryClientProvider,
 	QueryCache,
 } from "@tanstack/react-query";
-import { NotFound } from "@/components/NotFound.tsx";
+
+import NotFoundError from "./features/errors/not-found-error.tsx";
 import { ErrorComponent } from "@/components/ErrorComponent.tsx";
 import "./styles.css";
 
@@ -79,7 +80,7 @@ const router = createRouter({
 	defaultStructuralSharing: true,
 	defaultPreloadStaleTime: 0,
 	defaultPendingComponent: LoadingPage,
-	defaultNotFoundComponent: NotFound,
+	defaultNotFoundComponent: NotFoundError,
 	defaultErrorComponent: ({ error }) => <ErrorComponent error={error} />,
 });
 

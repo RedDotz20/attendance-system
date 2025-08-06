@@ -12,8 +12,7 @@ function AuthenticatedRouteLayout() {
 	return (
 		<>
 			{/* Todo: Add navigation Bar */}
-			{/* <SidebarProvider>
-			</SidebarProvider> */}
+			{/* <SidebarProvider></SidebarProvider> */}
 			<Outlet />
 		</>
 	);

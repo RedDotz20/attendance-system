@@ -17,7 +17,7 @@ export interface RouterContext {
 export const Route = createRootRouteWithContext<RouterContext>()({
 	beforeLoad: async ({ context }) => {
 		try {
-			// Prefetch auth data for better UX, but don't redirect here
+			// Prefetch auth data
 			return await context.queryClient.fetchQuery(authQuery);
 		} catch (error) {
 			console.error("Auth fetch failed in root:", error);
@@ -45,5 +45,4 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 		);
 	},
 	errorComponent: ErrorComponent,
-	notFoundComponent: () => <h1>NOT FOUND</h1>,
 });

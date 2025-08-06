@@ -1,7 +1,6 @@
+import { useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-// import { useQuery } from "@tanstack/react-query";
-// import { authQuery } from "@/features/auth/api/mutations";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 
 export const Route = createFileRoute("/")({
@@ -12,23 +11,19 @@ function App() {
 	const { isAuthenticated } = useAuth();
 	const navigate = useNavigate();
 
-	const redirectLogin = () => {
-		if (!isAuthenticated) {
-			return navigate({ to: "/auth" });
-		} else {
-			return navigate({ to: "/dashboard" });
-		}
-	};
+	const redirectLogin = useCallback(() => {
+		navigate({ to: isAuthenticated ? "/dashboard" : "/auth" });
+	}, [isAuthenticated, navigate]);
 
 	return (
 		<div className="text-center">
-			<header className="min-h-dvh flex flex-col items-center justify-center bg-[#282c34]  text-[calc(10px+2vmin)]">
-				Home Page
+			<header className="min-h-dvh flex flex-col items-center justify-center text-[calc(10px+2vmin)]">
+				<h1 className="mb-4 font-bold text-2xl">Attendance System</h1>
 				<Button
 					variant="secondary"
 					onClick={redirectLogin}
 				>
-					{!isAuthenticated ? "Login" : "Go To Dashboard"}
+					{isAuthenticated ? "Go To Dashboard" : "Login"}
 				</Button>
 			</header>
 		</div>
