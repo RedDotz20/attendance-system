@@ -1,7 +1,6 @@
 import { redirect } from "@tanstack/react-router";
 import { authQuery } from "../api/queries";
 import type { RouterContext } from "@/routes/__root";
-// import type { ParsedLocation } from "@tanstack/react-router";
 
 type requireAuthType = {
 	context: RouterContext;

@@ -6,7 +6,7 @@ export default function Dashboard() {
 	const handleSignOut = () => signOut.mutate();
 
 	return (
-		<div>
+		<div className="container w-full flex flex-col justify center items-center bg-amber-100">
 			<h1>Hello Dashboard!</h1>
 			<p className="mb-4">Welcome to your protected dashboard.</p>
 			{user && (
