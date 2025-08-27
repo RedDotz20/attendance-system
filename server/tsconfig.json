@@ -9,7 +9,12 @@
 		"jsx": "react-jsx",
 		"jsxImportSource": "hono/jsx",
 		"outDir": "./dist",
-		"esModuleInterop": true
+		"rootDir": "src",
+		"esModuleInterop": true,
+		"baseUrl": ".",
+		"paths": {
+			"@/*": ["src/*"]
+		}
 	},
 	"exclude": ["node_modules"]
 }

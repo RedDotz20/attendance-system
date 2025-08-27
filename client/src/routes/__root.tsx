@@ -1,34 +1,40 @@
-import React from "react";
 import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
+import { ErrorComponent } from "@/components/ErrorComponent";
+import { authQuery } from "@/features/auth/api/queries";
+import { Toaster } from "react-hot-toast";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { type QueryClient } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { Toaster } from "@/components/ui/sonner";
-import Header from "../components/Header";
-import { ErrorComponent } from "../components/ErrorComponent";
 
-interface RouterContext {
+import {
+	ReactQueryDevtools,
+	TanStackRouterDevtools,
+} from "@/utils/tanstack-dev-tools";
+
+export interface RouterContext {
 	queryClient: QueryClient;
 }
 
-const TanStackRouterDevtools =
-	process.env.NODE_ENV === "production"
-		? () => null // Render nothing in production
-		: React.lazy(() =>
-				// Lazy load in development
-				import("@tanstack/router-devtools").then((res) => ({
-					default: res.TanStackRouterDevtools,
-					// For Embedded Mode
-					// default: res.TanStackRouterDevtoolsPanel
-				}))
-		  );
-
 export const Route = createRootRouteWithContext<RouterContext>()({
+	beforeLoad: async ({ context }) => {
+		try {
+			// Prefetch auth data
+			return await context.queryClient.fetchQuery(authQuery);
+		} catch (error) {
+			console.error("Auth fetch failed in root:", error);
+			// Return a default state for unauthenticated users
+			return { authenticated: false, user: null };
+		}
+	},
 	component: () => {
 		return (
 			<>
-				<Header />
-				<Outlet />
-				<Toaster duration={50000} />
+				<Toaster position="top-center" />
+				<ThemeProvider
+					defaultTheme="dark"
+					storageKey="vite-ui-theme"
+				>
+					<Outlet />
+				</ThemeProvider>
 				{import.meta.env.MODE === "development" && (
 					<>
 						<ReactQueryDevtools buttonPosition="bottom-left" />
@@ -39,5 +45,4 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 		);
 	},
 	errorComponent: ErrorComponent,
-	notFoundComponent: () => <h1>NOT FOUND</h1>,
 });

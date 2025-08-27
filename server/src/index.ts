@@ -1,52 +1,39 @@
-import mongoose from "mongoose";
 import { serve } from "@hono/node-server";
-import { Hono } from "hono";
-import { loggingMiddleware } from "./middleware/logger.js";
-import { sessionAuth, requireRole } from "./middleware/auth.js";
-import authRoute from "./routes/auth.js";
-import auth from "./routes/auth.js";
-import type { Context } from "hono";
-import "dotenv/config";
+import { logger } from "@/shared/utils/logger.js";
+import os from "os";
+import app from "./app.js";
 
-type User = {
-	name: string;
-	role: string;
-	// add other user properties as needed
-};
+const environment = process.env.NODE_ENV || "development";
+const port = parseInt(process.env.PORT || "3000");
 
-type Variables = {
-	user: User;
-};
-
-const app = new Hono<{ Variables: Variables }>();
-
-mongoose
-	.connect(process.env.MONGODB_URI!)
-	.then(() => console.log("✅ MongoDB connected"))
-	.catch((err) => console.error("❌ MongoDB error:", err));
-
-// app.use("*", loggingMiddleware);
-app.route("/auth", auth);
-
-app.get("/admin", sessionAuth, requireRole("admin"), (c) => {
-	return c.text("Hello admin");
-});
-
-app.get("/dashboard", sessionAuth, (c) => {
-	const user = c.get("user");
-	return c.text(`Hello ${user.name} (${user.role})`);
-});
-
-app.get("/health", (c) => {
-	return c.text("🔥 Hello Hono!");
-});
+function getLocalIp(): string | null {
+	const interfaces = os.networkInterfaces();
+	for (const name of Object.keys(interfaces)) {
+		for (const iface of interfaces[name] || []) {
+			if (iface.family === "IPv4" && !iface.internal) {
+				return iface.address;
+			}
+		}
+	}
+	return null;
+}
 
 serve(
 	{
 		fetch: app.fetch,
-		port: parseInt(process.env.PORT!),
+		port,
 	},
 	(info) => {
-		console.log(`Server is running on http://localhost:${info.port}`);
+		const lanIp = getLocalIp();
+		if (environment === "production") {
+			logger.info(`🚀 Server is running in production on port ${info.port}`);
+		} else {
+			logger.info(
+				`🚀 Server is running locally at http://localhost:${info.port}`
+			);
+			if (lanIp) {
+				logger.info(`🌐 Accessible on LAN at http://${lanIp}:${info.port}`);
+			}
+		}
 	}
 );
