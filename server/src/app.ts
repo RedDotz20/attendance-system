@@ -6,6 +6,7 @@ import { HTTPException } from "hono/http-exception";
 import { healthCheckController } from "./shared/controller/health.controller.js";
 import { corsMiddleware } from "./shared/middleware/cors.middleware.js";
 import { auth } from "./modules/auth/routes/auth.routes.js";
+import { rfid } from "./modules/rfid/routes/rfid.routes.js";
 import { connectDB } from "./shared/config/database.js";
 import { upstashRateLimit } from "@/shared/middleware/rateLimiter.middleware.js";
 import type { HonoVariables } from "@/shared/types/variables.js";
@@ -30,6 +31,7 @@ await connectDB();
 // app.use("/health/*", upstashRateLimit);
 
 app.route("/auth", auth);
+app.route("/rfid", rfid);
 
 app.get("/admin", sessionAuth, requireRole("admin"), (c) => {
 	const user = c.get("user");
