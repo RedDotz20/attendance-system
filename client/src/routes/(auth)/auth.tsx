@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { redirect } from "@tanstack/react-router";
-import { authQuery } from "@/features/auth/api/queries";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import type { AuthState } from "@/features/auth/types/auth.type";
+import { AuthService } from "@/features/auth/services/auth.service";
 import AuthPage from "@/features/auth";
 
 export const Route = createFileRoute("/(auth)/auth")({
@@ -8,7 +8,10 @@ export const Route = createFileRoute("/(auth)/auth")({
 		const { queryClient } = context;
 
 		try {
-			const authData = await queryClient.ensureQueryData(authQuery);
+			const authData = await queryClient.ensureQueryData({
+				queryKey: AuthService.AUTH_QUERY_KEY,
+				queryFn: AuthService.getCurrentUser,
+			});
 
 			if (authData.isAuthenticated) {
 				throw redirect({
@@ -23,8 +26,11 @@ export const Route = createFileRoute("/(auth)/auth")({
 			}
 
 			// Check if there's cached auth data that indicates user is authenticated
-			const cachedAuthData = queryClient.getQueryData(authQuery.queryKey);
-			if (cachedAuthData && cachedAuthData.isAuthenticated) {
+			const cachedAuthData = queryClient.getQueryData<AuthState>(
+				AuthService.AUTH_QUERY_KEY
+			);
+
+			if (cachedAuthData?.isAuthenticated) {
 				throw redirect({
 					to: "/dashboard",
 					search: { redirect: location.href },

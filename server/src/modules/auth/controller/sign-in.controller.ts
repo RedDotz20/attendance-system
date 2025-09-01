@@ -28,51 +28,50 @@ export const SignInController = async (c: Context) => {
 	const parsed = SignInSchema.safeParse(body);
 
 	if (!parsed.success) {
-		if (!parsed.success) {
-			const { fieldErrors, formErrors } = parsed.error.flatten();
-			return c.json(
-				{
-					message: "Validation Failed",
-					errors: fieldErrors,
-					// Optionally include any form-wide errors:
-					...(formErrors.length > 0 ? { formErrors } : {}),
-				},
-				400
-			);
-		}
-		const { email, password } = parsed.data;
-		const user = await User.findOne({ email });
-
-		if (!user || !(await bcrypt.compare(password, user.password))) {
-			return c.json(
-				{
-					message: "Invalid credentials",
-					user: { name: null, email: null, role: null },
-				},
-				401
-			);
-		}
-
-		const { sessionId } = await createSession(
-			(user._id as { toString: () => string }).toString()
-		);
-
-		setCookie(c, "sessionId", sessionId, {
-			httpOnly: true,
-			secure: false,
-			maxAge: 60 * 60 * 24 * 7,
-			path: "/",
-		});
-
-		return c.json({
-			message: "SignedIn Successfully",
-			isAuthenticated: true,
-			user: {
-				id: (user._id as { toString: () => string }).toString(),
-				name: user.name,
-				email: user.email,
-				role: user.role,
+		const { fieldErrors, formErrors } = parsed.error.flatten();
+		return c.json(
+			{
+				message: "Validation Failed",
+				errors: fieldErrors,
+				// Optionally include any form-wide errors:
+				...(formErrors.length > 0 ? { formErrors } : {}),
 			},
-		});
+			400
+		);
 	}
+
+	const { email, password } = parsed.data;
+	const user = await User.findOne({ email });
+
+	if (!user || !(await bcrypt.compare(password, user.password))) {
+		return c.json(
+			{
+				message: "Invalid credentials",
+				user: { name: null, email: null, role: null },
+			},
+			401
+		);
+	}
+
+	const { sessionId } = await createSession(
+		(user._id as { toString: () => string }).toString()
+	);
+
+	setCookie(c, "sessionId", sessionId, {
+		httpOnly: true,
+		secure: false,
+		maxAge: 60 * 60 * 24 * 7,
+		path: "/",
+	});
+
+	return c.json({
+		message: "SignedIn Successfully",
+		isAuthenticated: true,
+		user: {
+			id: (user._id as { toString: () => string }).toString(),
+			name: user.name,
+			email: user.email,
+			role: user.role,
+		},
+	});
 };

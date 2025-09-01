@@ -3,7 +3,6 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 
 export default function Dashboard() {
 	const { user, signOut } = useAuth();
-	const handleSignOut = () => signOut.mutate();
 
 	return (
 		<div className="container w-full flex flex-col justify center items-center bg-amber-100">
@@ -16,7 +15,7 @@ export default function Dashboard() {
 				</div>
 			)}
 			<Button
-				onClick={handleSignOut}
+				onClick={signOut}
 				variant="destructive"
 			>
 				Logout

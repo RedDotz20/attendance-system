@@ -13,7 +13,6 @@ import { Settings, LogOut, User } from "lucide-react";
 
 export function TopNavigation() {
 	const { user, signOut } = useAuth();
-	const handleSignOut = () => signOut.mutate();
 
 	return (
 		<header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -118,7 +117,7 @@ export function TopNavigation() {
 								<span>Settings</span>
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
-							<DropdownMenuItem onClick={() => handleSignOut()}>
+							<DropdownMenuItem onClick={signOut}>
 								<LogOut className="mr-2 h-4 w-4" />
 								<span>Log out</span>
 							</DropdownMenuItem>
