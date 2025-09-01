@@ -11,15 +11,20 @@ export const useAuth = () => {
 
 	const signIn = useMutation({
 		...signInMutation,
-		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+		onSuccess: async (loginResponse) => {
+			// Directly set the query data with the login response BEFORE navigation
+			queryClient.setQueryData(["auth", "me"], {
+				isAuthenticated: true,
+				user: loginResponse.user,
+			});
+
 			toast.success("Login Success");
+
+			// Navigate after setting the cache data
 			navigate({ to: "/dashboard" });
-			// if (form.rememberMe) {
-			// 	localStorage.setItem("rememberedEmail", form.email);
-			// } else {
-			// 	localStorage.removeItem("rememberedEmail");
-			// }
+
+			// Invalidate to ensure fresh data on future requests
+			queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
 		},
 		onError: (err: any) => {
 			console.error(err.message);

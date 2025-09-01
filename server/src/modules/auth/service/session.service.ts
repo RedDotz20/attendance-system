@@ -18,3 +18,12 @@ export async function getSession(sessionId: string) {
 export async function deleteSession(sessionId: string) {
 	await Session.deleteOne({ sessionId });
 }
+
+// Make sure your cookie options include:
+const cookieOptions = {
+	httpOnly: true,
+	secure: process.env.NODE_ENV === "production", // Only secure in production
+	sameSite: "lax" as const, // Important for cross-browser compatibility
+	maxAge: 24 * 60 * 60 * 1000, // 24 hours
+	path: "/",
+};

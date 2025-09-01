@@ -12,10 +12,15 @@ export const requireAuth = async ({ context, location }: requireAuthType) => {
 
 	try {
 		const authData = await queryClient.ensureQueryData(authQuery);
-		if (!authData.isAuthenticated) {
+
+		console.log("requireAuth", authData);
+		if (!authData || !authData.isAuthenticated) {
 			throw redirect({ to: "/auth", search: { redirect: location.href } });
 		}
-	} catch {
+		return authData;
+	} catch (error) {
+		// If there's any error (network, server, etc.), redirect to auth
+		console.warn("Authentication check failed:", error);
 		throw redirect({ to: "/auth", search: { redirect: location.href } });
 	}
 };
