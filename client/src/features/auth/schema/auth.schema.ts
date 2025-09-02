@@ -35,10 +35,3 @@ export const signUpSchema = z
 // Inferred types
 export type SignInFormData = z.infer<typeof signInSchema>;
 export type SignUpFormData = z.infer<typeof signUpSchema>;
-
-// Legacy schema for backward compatibility
-/** @deprecated Use signInSchema instead */
-export const formSchema = signInSchema;
-
-/** @deprecated Use SignInFormData instead */
-export type authFormType = SignInFormData;

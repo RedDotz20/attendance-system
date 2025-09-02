@@ -6,9 +6,6 @@ import type {
 	SignInCredentials,
 	SignUpCredentials,
 	ProtectedRouteParams,
-	// Legacy types for backward compatibility
-	userType,
-	protectedRouteType,
 } from "../types/auth.type";
 
 /**
@@ -19,7 +16,7 @@ const fetchCurrentUserData = async (): Promise<AuthState> => {
 	try {
 		return await ApiClient.get<AuthState>("/auth/me");
 	} catch (error) {
-		console.warn("Authentication check failed:", error);
+		// Authentication check failed, return unauthenticated state
 		return {
 			user: null,
 			isAuthenticated: false,
@@ -110,20 +107,11 @@ export class AuthService {
 				throw error;
 			}
 
-			console.warn("Route protection failed:", error);
+			// Authentication failed, redirect to auth page
 			throw redirect({
 				to: "/auth",
 				search: { redirect: location.href },
 			});
 		}
-	}
-
-	// Legacy methods for backward compatibility (deprecated)
-	/** @deprecated Use protectRoute with ProtectedRouteParams instead */
-	static async requireAuth({
-		context,
-		location,
-	}: protectedRouteType): Promise<userType> {
-		return this.protectRoute({ context, location });
 	}
 }

@@ -33,7 +33,6 @@ export const useAuth = () => {
 	 * Handle mutation errors with consistent error display
 	 */
 	const handleError = (error: Error) => {
-		console.error("Auth error:", error.message);
 		toast.error(error.message, {
 			style: { border: "2px solid red" },
 		});

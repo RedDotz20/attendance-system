@@ -43,13 +43,3 @@ export interface ProtectedRouteParams {
 		hash: string;
 	};
 }
-
-// Legacy type aliases for backward compatibility (deprecated)
-/** @deprecated Use AuthState instead */
-export type userType = AuthState;
-
-/** @deprecated Use SignUpCredentials instead */
-export type credentialsType = SignUpCredentials;
-
-/** @deprecated Use ProtectedRouteParams instead */
-export type protectedRouteType = ProtectedRouteParams;

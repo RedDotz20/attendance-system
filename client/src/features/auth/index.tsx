@@ -42,7 +42,6 @@ export default function AuthenticationPage() {
 				}
 			} catch (error) {
 				// Error is handled by the useAuth hook
-				console.error("Login failed:", error);
 			}
 		},
 	});
