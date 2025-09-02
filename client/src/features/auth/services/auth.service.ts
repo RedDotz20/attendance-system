@@ -46,7 +46,7 @@ export class AuthService {
 	 */
 	static async signIn(credentials: SignInCredentials): Promise<AuthResponse> {
 		return ApiClient.post<AuthResponse, SignInCredentials>(
-			this.ENDPOINTS.SIGN_IN,
+			AuthService.ENDPOINTS.SIGN_IN,
 			credentials
 		);
 	}
@@ -56,7 +56,7 @@ export class AuthService {
 	 */
 	static async signUp(credentials: SignUpCredentials): Promise<AuthResponse> {
 		return ApiClient.post<AuthResponse, SignUpCredentials>(
-			this.ENDPOINTS.SIGN_UP,
+			AuthService.ENDPOINTS.SIGN_UP,
 			credentials
 		);
 	}
@@ -65,7 +65,7 @@ export class AuthService {
 	 * Sign out current user
 	 */
 	static async signOut(): Promise<{ message: string }> {
-		return ApiClient.post<{ message: string }>(this.ENDPOINTS.SIGN_OUT);
+		return ApiClient.post<{ message: string }>(AuthService.ENDPOINTS.SIGN_OUT);
 	}
 
 	/**

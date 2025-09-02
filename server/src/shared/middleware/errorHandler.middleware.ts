@@ -4,7 +4,13 @@ import type { ApiResponse } from "../types/common.js";
 import { logger } from "@/shared/utils/logger.js";
 
 export const errorHandler = async (err: Error, c: Context) => {
-	logger.error("Unhandled API Error", err, { path: c.req.path });
+	logger.error(
+		{
+			err: err,
+			path: c.req.path,
+		},
+		"Unhandled API Error"
+	);
 
 	// Default error message
 	let message = "Internal Server Error";
@@ -31,7 +37,12 @@ export const errorHandler = async (err: Error, c: Context) => {
 				}));
 			}
 		} catch (parseError) {
-			logger.warn("Could not parse validation error message", parseError);
+			logger.warn(
+				{
+					parseError: parseError,
+				},
+				"Could not parse validation error message"
+			);
 		}
 	}
 

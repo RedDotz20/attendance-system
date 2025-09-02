@@ -1,8 +1,12 @@
+import type { Context, Next } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
 import { getSession } from "../../modules/auth/service/session.service.js";
 
-export const sessionAuth: MiddlewareHandler = async (c, next) => {
+export const sessionAuth: MiddlewareHandler = async (
+	c: Context,
+	next: Next
+) => {
 	const sessionId = getCookie(c, "sessionId");
 	if (!sessionId) return c.json({ message: "Unauthorized" }, 401);
 
@@ -15,7 +19,7 @@ export const sessionAuth: MiddlewareHandler = async (c, next) => {
 
 export const requireRole =
 	(requiredRole: "admin" | "user"): MiddlewareHandler =>
-	async (c, next) => {
+	async (c: Context, next: Next) => {
 		const user = c.get("user");
 
 		if (!user || !user.role) {

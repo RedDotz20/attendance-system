@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
 import { logger } from "hono/logger";
@@ -15,6 +16,7 @@ import {
 	sessionAuth,
 	requireRole,
 } from "./shared/middleware/auth.middleware.js";
+import { apiKeyAuth } from "./shared/middleware/api-key.middleware.js";
 
 const app = new Hono<{ Variables: HonoVariables }>();
 
@@ -33,27 +35,41 @@ await connectDB();
 app.route("/auth", auth);
 app.route("/rfid", rfid);
 
-app.get("/admin", sessionAuth, requireRole("admin"), (c) => {
-	const user = c.get("user");
-	return c.json(
-		{
-			message: `Hello ${user.name}`,
-			role: user.role,
-			email: user.email,
-			id: user.id,
-		},
-		200
-	);
-});
+// Admin endpoint - requires both API key and admin session
+app.get(
+	"/admin",
+	apiKeyAuth,
+	sessionAuth,
+	requireRole("admin"),
+	(c: Context) => {
+		const user = c.get("user");
+		return c.json(
+			{
+				message: `Hello ${user.name}`,
+				role: user.role,
+				email: user.email,
+				id: user.id,
+			},
+			200
+		);
+	}
+);
 
-app.get("/dashboard", sessionAuth, requireRole("user"), (c) => {
-	const user = c.get("user");
-	return c.json({ message: `Hello ${user.name}`, role: user.role }, 200);
-});
+// Dashboard endpoint - requires both API key and user session
+app.get(
+	"/dashboard",
+	apiKeyAuth,
+	sessionAuth,
+	requireRole("user"),
+	(c: Context) => {
+		const user = c.get("user");
+		return c.json({ message: `Hello ${user.name}`, role: user.role }, 200);
+	}
+);
 
 app.get("/health", healthCheckController);
 
-app.onError((err, c) => {
+app.onError((err: Error, c: Context) => {
 	if (err instanceof HTTPException) {
 		return err.getResponse();
 	}

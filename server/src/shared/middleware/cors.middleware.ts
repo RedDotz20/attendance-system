@@ -20,6 +20,6 @@ export const corsMiddleware = cors({
 		return "";
 	},
 	credentials: true,
-	allowHeaders: ["Content-Type", "Authorization", "Cookie"],
+	allowHeaders: ["Content-Type", "Authorization", "Cookie", "x-api-key"],
 	allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 });
