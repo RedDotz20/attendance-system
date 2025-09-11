@@ -18,6 +18,7 @@ import { Route as errors403RouteImport } from './routes/(errors)/403'
 import { Route as errors401RouteImport } from './routes/(errors)/401'
 import { Route as authAuthRouteImport } from './routes/(auth)/auth'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
+import { Route as AuthenticatedFingerprintsIndexRouteImport } from './routes/_authenticated/fingerprints/index'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -64,6 +65,12 @@ const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexRouteImport.update({
   path: '/users/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedFingerprintsIndexRoute =
+  AuthenticatedFingerprintsIndexRouteImport.update({
+    id: '/fingerprints/',
+    path: '/fingerprints/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDashboardIndexRoute =
   AuthenticatedDashboardIndexRouteImport.update({
     id: '/dashboard/',
@@ -80,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
+  '/fingerprints': typeof AuthenticatedFingerprintsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -91,6 +99,7 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
+  '/fingerprints': typeof AuthenticatedFingerprintsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRoutesById {
@@ -104,6 +113,7 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
+  '/_authenticated/fingerprints/': typeof AuthenticatedFingerprintsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRouteTypes {
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/dashboard'
+    | '/fingerprints'
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/dashboard'
+    | '/fingerprints'
     | '/users'
   id:
     | '__root__'
@@ -140,6 +152,7 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/dashboard/'
+    | '/_authenticated/fingerprints/'
     | '/_authenticated/users/'
   fileRoutesById: FileRoutesById
 }
@@ -219,6 +232,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUsersIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/fingerprints/': {
+      id: '/_authenticated/fingerprints/'
+      path: '/fingerprints'
+      fullPath: '/fingerprints'
+      preLoaderRoute: typeof AuthenticatedFingerprintsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard/': {
       id: '/_authenticated/dashboard/'
       path: '/dashboard'
@@ -231,11 +251,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
+  AuthenticatedFingerprintsIndexRoute: typeof AuthenticatedFingerprintsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
+  AuthenticatedFingerprintsIndexRoute: AuthenticatedFingerprintsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
 }
 

@@ -22,6 +22,13 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 #define LED_RED 4
 #define BUZZER 5
 
+// Forward declarations
+String getCardUID();
+bool checkAndMarkAttendance(String cardUID);
+bool checkAndMarkAttendanceQuery(String cardUID);
+bool registerCard(String cardUID, String studentName, String studentId);
+bool checkCardRegistration(String cardUID);
+
 void setup() {
   Serial.begin(115200);
 

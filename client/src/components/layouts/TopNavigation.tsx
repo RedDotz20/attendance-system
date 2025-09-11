@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { Settings, LogOut, User } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 export function TopNavigation() {
 	const { user, signOut } = useAuth();
@@ -27,30 +28,24 @@ export function TopNavigation() {
 
 				{/* Navigation Links */}
 				<nav className="hidden md:flex items-center space-x-6">
-					<a
-						href="#"
+					<Link
+						to="/dashboard"
 						className="text-sm font-medium hover:text-primary transition-colors"
 					>
 						Dashboard
-					</a>
+					</Link>
 					<a
-						href="#"
+						href="/fingerprints"
 						className="text-sm font-medium hover:text-primary transition-colors"
 					>
-						Projects
+						Fingerprints
 					</a>
-					<a
-						href="#"
+					<Link
+						to="/users"
 						className="text-sm font-medium hover:text-primary transition-colors"
 					>
-						Team
-					</a>
-					<a
-						href="#"
-						className="text-sm font-medium hover:text-primary transition-colors"
-					>
-						Analytics
-					</a>
+						Users
+					</Link>
 				</nav>
 
 				{/* Right Side Actions */}

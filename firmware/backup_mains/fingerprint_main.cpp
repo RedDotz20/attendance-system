@@ -25,9 +25,6 @@ String registerEndpoint = "/fingerprint/register";
 String attendanceEndpoint = "/fingerprint/attendance";
 String checkEndpoint = "/fingerprint/check/";
 
-// --- API Key for Authentication ---
-const char* apiKey = "2776f6c9816044c16543a6111545e0f2ec03eac6877f3930bf4e01e65fabcb9f";
-
 // --- Mode Control ---
 bool registerMode = false;
 String nameInput = "";
@@ -160,7 +157,6 @@ void printMenu() {
   Serial.println("enroll          - Enroll new fingerprint");
   Serial.println("name <full name> - Set name for registration");
   Serial.println("dept <department>- Set department for registration");
-  Serial.println("apikey <key>     - Set API key for server authentication");
   Serial.println("clear           - Clear registration data");
   Serial.println("menu            - Show this menu");
   Serial.println("================\n");
@@ -201,17 +197,6 @@ void handleSerialCommand(String cmd) {
       registerFingerprint(pendingFingerprintID, nameInput, departmentInput);
       awaitingRegistrationDetails = false;
       pendingFingerprintID = 0;
-    }
-  } else if (cmd.startsWith("apikey ")) {
-    String newApiKey = cmd.substring(7);
-    newApiKey.trim();
-    if (newApiKey.length() > 0) {
-      // Update the API key (note: this is temporary and will reset on restart)
-      apiKey = newApiKey.c_str();
-      Serial.printf("🔑 API key updated to: %s\n", newApiKey.c_str());
-      Serial.println("⚠️  Note: API key will reset to default on restart");
-    } else {
-      Serial.println("❌ Please provide an API key: apikey <your_key>");
     }
   } else if (cmd.equalsIgnoreCase("clear")) {
     clearRegistrationData();
@@ -344,7 +329,6 @@ bool checkFingerprintRegistered(uint16_t fingerprintID) {
 
   HTTPClient http;
   setupHTTPClient(http, baseUrl + checkEndpoint + String(fingerprintID));
-  http.addHeader("X-API-Key", apiKey);  // Add API key header
 
   int httpResponseCode = http.GET();
   bool isRegistered = false;
@@ -384,7 +368,6 @@ void registerFingerprint(uint16_t fingerprintID, String name, String department)
   HTTPClient http;
   setupHTTPClient(http, baseUrl + registerEndpoint);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-API-Key", apiKey);  // Add API key header
 
   String jsonPayload = "{\"fingerprintId\":\"" + String(fingerprintID) + "\",\"name\":\"" + name + "\",\"department\":\"" + department + "\"}";
   Serial.println("📤 Registering fingerprint...");
@@ -424,7 +407,6 @@ void markAttendance(uint16_t fingerprintID) {
   HTTPClient http;
   setupHTTPClient(http, baseUrl + attendanceEndpoint);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-API-Key", apiKey);  // Add API key header
 
   String jsonPayload = "{\"fingerprintId\":\"" + String(fingerprintID) + "\"}";
   Serial.println("📝 Marking attendance...");

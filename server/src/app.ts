@@ -13,6 +13,7 @@ import { healthCheckController } from "./shared/controller/health.controller.js"
 import { corsMiddleware } from "./shared/middleware/cors.middleware.js";
 import { auth } from "./modules/auth/routes/auth.routes.js";
 import { rfid } from "./modules/rfid/routes/rfid.routes.js";
+import { fingerprint } from "./modules/fingerprint/routes/fingerprint.routes.js";
 
 // Configuration and utilities
 import { connectDB } from "./shared/config/database.js";
@@ -46,6 +47,7 @@ await connectDB();
 // Routes
 app.route("/auth", auth);
 app.route("/rfid", rfid);
+app.route("/fingerprint", fingerprint);
 
 // Protected routes
 app.get("/health", healthCheckController);
