@@ -15,7 +15,7 @@ import { Button } from "./ui/button";
 
 export function ErrorComponent({ error }: { error: Error }) {
 	const router = useRouter();
-	const isDev = process.env.NODE_ENV !== "production";
+	const isDev = import.meta.env.MODE !== "production";
 
 	const queryClientErrorBoundary = useQueryErrorResetBoundary();
 

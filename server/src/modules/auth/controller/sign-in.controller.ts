@@ -1,77 +1,141 @@
-import bcrypt from "bcryptjs";
+/**
+ * Sign-in controller with strict typing and improved error handling
+ */
+
 import { setCookie, getCookie } from "hono/cookie";
-import { User } from "@/modules/users/models/user.model.js";
-import {
-	createSession,
-	getSession,
-} from "@/modules/auth/service/session.service.js";
-import { SignInSchema } from "@/modules/users/validators/user.validator.js";
 import type { Context } from "hono";
+import { sessionService } from "@/modules/auth/service/session.service.js";
+import { userService } from "@/modules/users/service/user.service.js";
+import {
+	SignInSchema,
+	type SignInInput,
+} from "@/modules/users/validators/user.validator.js";
+import {
+	success,
+	validationError,
+	unauthorized,
+} from "@/shared/utils/response.js";
+import { logger } from "@/shared/utils/logger.js";
+import { isSuccess } from "@/shared/types/common.js";
 
-// Sign-In / Login User
-export const SignInController = async (c: Context) => {
-	const existingSessionId = getCookie(c, "sessionId");
-
-	if (existingSessionId) {
-		const session = await getSession(existingSessionId);
-		if (session) {
-			const user = await User.findById(session.userId);
-			if (!user) return c.text("User not found", 404);
-			return c.json({
-				message: "Already signed in",
-				user: { name: user.name, email: user.email, role: user.role },
-			});
+/**
+ * Sign-In / Login User Controller
+ */
+export const SignInController = async (c: Context): Promise<Response> => {
+	try {
+		// Check if user is already signed in
+		const existingSessionId = getCookie(c, "sessionId");
+		if (existingSessionId) {
+			const sessionResult = await sessionService.getSession(existingSessionId);
+			if (sessionResult.success && sessionResult.data.user) {
+				logger.info(
+					{ userId: sessionResult.data.user.id },
+					"User already signed in"
+				);
+				return success(
+					c,
+					{
+						user: sessionResult.data.user,
+						isAuthenticated: true,
+					},
+					"Already signed in"
+				);
+			}
 		}
-	}
 
-	const body = await c.req.json();
-	const parsed = SignInSchema.safeParse(body);
+		// Parse and validate request body
+		const body = await c.req.json();
+		const validationResult = SignInSchema.safeParse(body);
 
-	if (!parsed.success) {
-		const { fieldErrors, formErrors } = parsed.error.flatten();
-		return c.json(
+		if (!validationResult.success) {
+			const errors = validationResult.error.issues.map((err) => ({
+				field: err.path.join("."),
+				message: err.message,
+				code: err.code,
+			}));
+
+			logger.warn({ errors }, "Sign-in validation failed");
+			return validationError(c, errors);
+		}
+
+		const { email, password }: SignInInput = validationResult.data;
+
+		logger.info({ email }, "Attempting to authenticate user");
+
+		// Authenticate user
+		const authResult = await userService.authenticateUser(email, password);
+		logger.info(
 			{
-				message: "Validation Failed",
-				errors: fieldErrors,
-				// Optionally include any form-wide errors:
-				...(formErrors.length > 0 ? { formErrors } : {}),
+				email,
+				authSuccess: authResult.success,
+				...(authResult.success ? {} : { error: authResult.error?.message }),
 			},
-			400
+			"Authentication result"
 		);
-	}
 
-	const { email, password } = parsed.data;
-	const user = await User.findOne({ email });
+		if (!isSuccess(authResult)) {
+			logger.warn({ email }, "Authentication failed");
+			return unauthorized(c, "Invalid email or password");
+		}
 
-	if (!user || !(await bcrypt.compare(password, user.password))) {
-		return c.json(
+		const user = authResult.data;
+		logger.info(
+			{ userId: user.id, email: user.email },
+			"User authenticated successfully"
+		);
+
+		// Create session
+		const sessionResult = await sessionService.createSession(user.id);
+		if (!isSuccess(sessionResult)) {
+			logger.error(
+				{ userId: user.id, error: sessionResult.error },
+				"Failed to create session"
+			);
+			return unauthorized(c, "Failed to create session");
+		}
+
+		const { sessionId } = sessionResult.data;
+
+		// Set session cookie
+		const cookieOptions = sessionService.getCookieOptions();
+		setCookie(c, "sessionId", sessionId, cookieOptions);
+
+		logger.info(
 			{
-				message: "Invalid credentials",
-				user: { name: null, email: null, role: null },
+				userId: user.id,
+				email: user.email,
+				sessionId,
 			},
-			401
+			"User signed in successfully"
 		);
+
+		return success(
+			c,
+			{
+				user: {
+					id: user.id,
+					name: user.name,
+					email: user.email,
+					role: user.role,
+				},
+				isAuthenticated: true,
+			},
+			"Signed in successfully"
+		);
+	} catch (error) {
+		logger.error(
+			{
+				error:
+					error instanceof Error
+						? {
+								name: error.name,
+								message: error.message,
+								stack: error.stack,
+						  }
+						: error,
+			},
+			"Sign-in controller error"
+		);
+		return unauthorized(c, "Sign-in failed");
 	}
-
-	const { sessionId } = await createSession(
-		(user._id as { toString: () => string }).toString()
-	);
-
-	setCookie(c, "sessionId", sessionId, {
-		httpOnly: true,
-		secure: false,
-		maxAge: 60 * 60 * 24 * 7,
-		path: "/",
-	});
-
-	return c.json({
-		message: "SignedIn Successfully",
-		isAuthenticated: true,
-		user: {
-			id: (user._id as { toString: () => string }).toString(),
-			name: user.name,
-			email: user.email,
-			role: user.role,
-		},
-	});
 };

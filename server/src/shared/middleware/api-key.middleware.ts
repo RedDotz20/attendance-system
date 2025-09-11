@@ -6,7 +6,10 @@ import { logger } from "@/shared/utils/logger.js";
  * Middleware to validate API secret key from request headers
  * Looks for the API key in the 'X-API-Key' header
  */
-export const apiKeyAuth: MiddlewareHandler = async (c: Context, next: Next) => {
+export const apiKeyAuth: MiddlewareHandler = async (
+	c: Context,
+	next: Next
+): Promise<Response | void> => {
 	const apiKey = c.req.header("X-API-Key");
 
 	if (!apiKey) {
@@ -20,7 +23,7 @@ export const apiKeyAuth: MiddlewareHandler = async (c: Context, next: Next) => {
 		);
 	}
 
-	if (apiKey !== env.API_SECRET_KEY) {
+	if (apiKey !== env["API_SECRET_KEY"]) {
 		logger.warn(
 			{
 				providedKey: apiKey?.substring(0, 8) + "...", // Log only first 8 chars for security
@@ -57,7 +60,7 @@ export const apiKeyAuth: MiddlewareHandler = async (c: Context, next: Next) => {
 export const apiKeyAuthQuery: MiddlewareHandler = async (
 	c: Context,
 	next: Next
-) => {
+): Promise<Response | void> => {
 	const apiKey = c.req.query("api_key");
 
 	if (!apiKey) {
@@ -72,7 +75,7 @@ export const apiKeyAuthQuery: MiddlewareHandler = async (
 		);
 	}
 
-	if (apiKey !== env.API_SECRET_KEY) {
+	if (apiKey !== env["API_SECRET_KEY"]) {
 		logger.warn(
 			{
 				providedKey: apiKey?.substring(0, 8) + "...", // Log only first 8 chars for security
@@ -108,7 +111,7 @@ export const apiKeyAuthQuery: MiddlewareHandler = async (
 export const apiKeyAuthFlexible: MiddlewareHandler = async (
 	c: Context,
 	next: Next
-) => {
+): Promise<Response | void> => {
 	const headerApiKey = c.req.header("X-API-Key");
 	const queryApiKey = c.req.query("api_key");
 	const apiKey = headerApiKey || queryApiKey;
@@ -125,7 +128,7 @@ export const apiKeyAuthFlexible: MiddlewareHandler = async (
 		);
 	}
 
-	if (apiKey !== env.API_SECRET_KEY) {
+	if (apiKey !== env["API_SECRET_KEY"]) {
 		logger.warn(
 			{
 				providedKey: apiKey?.substring(0, 8) + "...", // Log only first 8 chars for security

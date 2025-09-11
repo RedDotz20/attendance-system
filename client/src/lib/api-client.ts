@@ -1,27 +1,11 @@
 import { AxiosError, type AxiosResponse } from "axios";
 import api from "@/lib/axios";
+import type { ApiResponse, ApiErrorResponse } from "@/types/api";
+import { isSuccessResponse } from "@/types/api";
 
 /**
- * Standard API error response format
- */
-export interface ApiErrorResponse {
-	message: string;
-	statusCode?: number;
-	error?: string;
-	details?: unknown;
-}
-
-/**
- * Standard API success response format
- */
-export interface ApiSuccessResponse<T = unknown> {
-	data: T;
-	message?: string;
-	success: boolean;
-}
-
-/**
- * API client utility class with standardized error handling
+ * Enhanced API client utility class with standardized error handling
+ * Updated to work with the new server response structure
  */
 export class ApiClient {
 	/**
@@ -33,18 +17,40 @@ export class ApiClient {
 				| ApiErrorResponse
 				| undefined;
 
-			// Extract error message from various possible locations
-			const message =
-				errorResponse?.message ||
-				errorResponse?.error ||
-				error.message ||
-				"An unexpected error occurred";
+			if (errorResponse && !errorResponse.success) {
+				// Handle validation errors
+				if (errorResponse.errors && errorResponse.errors.length > 0) {
+					const validationMessages = errorResponse.errors
+						.map((err) => `${err.field}: ${err.message}`)
+						.join(", ");
 
-			// Create a new error with the extracted message and include status info
+					const apiError = new Error(
+						`Validation failed: ${validationMessages}`
+					);
+					(apiError as any).statusCode = error.response?.status;
+					(apiError as any).code = errorResponse.error.code;
+					(apiError as any).validationErrors = errorResponse.errors;
+					(apiError as any).originalError = error;
+					throw apiError;
+				}
+
+				// Handle general API errors
+				const message =
+					errorResponse.error?.message ||
+					errorResponse.message ||
+					"An error occurred";
+				const apiError = new Error(message);
+				(apiError as any).statusCode = error.response?.status;
+				(apiError as any).code = errorResponse.error?.code;
+				(apiError as any).originalError = error;
+				throw apiError;
+			}
+
+			// Fallback for non-API errors
+			const message = error.message || "An unexpected error occurred";
 			const apiError = new Error(message);
 			(apiError as any).statusCode = error.response?.status;
 			(apiError as any).originalError = error;
-
 			throw apiError;
 		}
 
@@ -56,12 +62,39 @@ export class ApiClient {
 	}
 
 	/**
+	 * Extracts data from API response, handling both old and new response formats
+	 */
+	private static extractResponseData<T>(
+		response: AxiosResponse<ApiResponse<T> | T>
+	): T {
+		const data = response.data;
+
+		// Check if it's the new API response format
+		if (typeof data === "object" && data !== null && "success" in data) {
+			const apiResponse = data as ApiResponse<T>;
+
+			if (isSuccessResponse(apiResponse)) {
+				return apiResponse.data;
+			} else {
+				// This is an error response that somehow got through
+				const errorMsg = apiResponse.error?.message || "Unknown error";
+				const error = new Error(errorMsg);
+				(error as any).code = apiResponse.error?.code;
+				throw error;
+			}
+		}
+
+		// Fallback for old format or direct data responses
+		return data as T;
+	}
+
+	/**
 	 * Makes a GET request with standardized error handling
 	 */
 	static async get<T>(url: string): Promise<T> {
 		try {
-			const response: AxiosResponse<T> = await api.get(url);
-			return response.data;
+			const response: AxiosResponse<ApiResponse<T> | T> = await api.get(url);
+			return this.extractResponseData<T>(response);
 		} catch (error) {
 			this.handleError(error);
 		}
@@ -72,8 +105,11 @@ export class ApiClient {
 	 */
 	static async post<T, D = unknown>(url: string, data?: D): Promise<T> {
 		try {
-			const response: AxiosResponse<T> = await api.post(url, data);
-			return response.data;
+			const response: AxiosResponse<ApiResponse<T> | T> = await api.post(
+				url,
+				data
+			);
+			return this.extractResponseData<T>(response);
 		} catch (error) {
 			this.handleError(error);
 		}
@@ -84,8 +120,11 @@ export class ApiClient {
 	 */
 	static async put<T, D = unknown>(url: string, data?: D): Promise<T> {
 		try {
-			const response: AxiosResponse<T> = await api.put(url, data);
-			return response.data;
+			const response: AxiosResponse<ApiResponse<T> | T> = await api.put(
+				url,
+				data
+			);
+			return this.extractResponseData<T>(response);
 		} catch (error) {
 			this.handleError(error);
 		}
@@ -96,8 +135,11 @@ export class ApiClient {
 	 */
 	static async patch<T, D = unknown>(url: string, data?: D): Promise<T> {
 		try {
-			const response: AxiosResponse<T> = await api.patch(url, data);
-			return response.data;
+			const response: AxiosResponse<ApiResponse<T> | T> = await api.patch(
+				url,
+				data
+			);
+			return this.extractResponseData<T>(response);
 		} catch (error) {
 			this.handleError(error);
 		}
@@ -108,8 +150,8 @@ export class ApiClient {
 	 */
 	static async delete<T>(url: string): Promise<T> {
 		try {
-			const response: AxiosResponse<T> = await api.delete(url);
-			return response.data;
+			const response: AxiosResponse<ApiResponse<T> | T> = await api.delete(url);
+			return this.extractResponseData<T>(response);
 		} catch (error) {
 			this.handleError(error);
 		}

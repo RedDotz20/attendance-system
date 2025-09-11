@@ -46,11 +46,11 @@ export const errorHandler = async (err: Error, c: Context) => {
 		}
 	}
 
-	const response: ApiResponse<null> = {
+	const response = {
 		success: false,
 		message,
 		errors,
-	};
+	} as any;
 
 	return c.json(response, statusCode as any);
 };

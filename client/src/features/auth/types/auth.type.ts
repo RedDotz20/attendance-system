@@ -1,37 +1,32 @@
 import type { RouterContext } from "@/routes/__root";
+import type {
+	UserWithTimestamps,
+	LoginCredentials,
+	RegisterCredentials,
+} from "@/types/user.type";
 
-// User entity type
-export interface User {
-	id: string;
-	name: string;
-	email: string;
-	role: string;
-}
-
-// Authentication state type
+// Authentication state type (updated to match server responses)
 export interface AuthState {
 	isAuthenticated: boolean;
-	user: User | null;
+	user: UserWithTimestamps | null;
 	message?: string;
 }
 
-// Authentication response type for login/register
+// Authentication response type for login (matches server response structure)
 export interface AuthResponse {
-	user: User;
-	token?: string;
+	user: UserWithTimestamps;
+	isAuthenticated: boolean;
 	message?: string;
 }
 
-// Sign in credentials
-export interface SignInCredentials {
-	email: string;
-	password: string;
-}
+// Sign in credentials (matches server)
+export interface SignInCredentials extends LoginCredentials {}
 
-// Sign up credentials
-export interface SignUpCredentials extends SignInCredentials {
-	name: string;
-}
+// Sign up credentials (matches server)
+export interface SignUpCredentials extends RegisterCredentials {}
+
+// Session response (matches server)
+export interface SessionResponse extends AuthResponse {}
 
 // Protected route parameters
 export interface ProtectedRouteParams {
@@ -42,4 +37,17 @@ export interface ProtectedRouteParams {
 		search: Record<string, unknown>;
 		hash: string;
 	};
+}
+
+// Auth error types for better error handling
+export interface AuthError {
+	code: string;
+	message: string;
+	field?: string;
+}
+
+// Role-based access control types
+export interface RoleGuardParams extends ProtectedRouteParams {
+	requiredRole?: string;
+	allowAdmin?: boolean;
 }

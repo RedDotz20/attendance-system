@@ -7,8 +7,8 @@ import type {
 	SignUpCredentials,
 	AuthResponse,
 	AuthState,
-	User,
 } from "../types/auth.type";
+import type { UserWithTimestamps } from "@/types/user.type";
 
 /**
  * Authentication hook providing auth state and operations
@@ -45,7 +45,7 @@ export const useAuth = () => {
 		const authState: AuthState = {
 			isAuthenticated: true,
 			user: authResponse.user,
-			message: authResponse.message,
+			...(authResponse.message && { message: authResponse.message }),
 		};
 
 		// Update query cache immediately
@@ -118,7 +118,7 @@ export const useAuth = () => {
 
 	// Computed values
 	const isAuthenticated = Boolean(authData?.user && authData.isAuthenticated);
-	const user: User | null = authData?.user || null;
+	const user: UserWithTimestamps | null = authData?.user || null;
 	const isLoading =
 		isAuthLoading ||
 		signInMutation.isPending ||

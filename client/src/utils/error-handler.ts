@@ -2,8 +2,8 @@
  * Enhanced error class with additional context
  */
 export class AppError extends Error {
-	public readonly statusCode?: number;
-	public readonly originalError?: Error;
+	public readonly statusCode: number | undefined;
+	public readonly originalError: Error | undefined;
 	public readonly timestamp: string;
 
 	constructor(message: string, statusCode?: number, originalError?: Error) {

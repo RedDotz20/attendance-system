@@ -1,81 +1,119 @@
+/**
+ * Main application setup with strict typing and enhanced error handling
+ */
+
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
 import { logger } from "hono/logger";
-import { HTTPException } from "hono/http-exception";
+
+// Route imports
 import { healthCheckController } from "./shared/controller/health.controller.js";
 import { corsMiddleware } from "./shared/middleware/cors.middleware.js";
 import { auth } from "./modules/auth/routes/auth.routes.js";
 import { rfid } from "./modules/rfid/routes/rfid.routes.js";
+
+// Configuration and utilities
 import { connectDB } from "./shared/config/database.js";
 import { upstashRateLimit } from "@/shared/middleware/rateLimiter.middleware.js";
-import type { HonoVariables } from "@/shared/types/variables.js";
-import { logger as CustomLog } from "./shared/utils/logger.js";
 import {
 	sessionAuth,
 	requireRole,
 } from "./shared/middleware/auth.middleware.js";
 import { apiKeyAuth } from "./shared/middleware/api-key.middleware.js";
+import { createErrorHandler } from "./shared/utils/error-handler.js";
+import { success } from "./shared/utils/response.js";
+import { UserRoles } from "./modules/users/types/user.type.js";
+import type { HonoVariables } from "@/shared/types/variables.js";
+import { logger as CustomLog } from "./shared/utils/logger.js";
 
+// Create Hono app with strict typing
 const app = new Hono<{ Variables: HonoVariables }>();
 
+// Global middleware
 app.use("*", corsMiddleware);
-
 app.use(secureHeaders());
-// app.use(csrf());
+// app.use(csrf()); // Enable when needed
 app.use(logger());
 
-// connect mongodb database
+// Connect to database
 await connectDB();
 
-// use Rate Limit
-// app.use("/health/*", upstashRateLimit);
+// Rate limiting (enable when needed)
+// app.use("/api/*", upstashRateLimit);
 
+// Routes
 app.route("/auth", auth);
 app.route("/rfid", rfid);
+
+// Protected routes
+app.get("/health", healthCheckController);
 
 // Admin endpoint - requires both API key and admin session
 app.get(
 	"/admin",
 	apiKeyAuth,
 	sessionAuth,
-	requireRole("admin"),
+	requireRole(UserRoles.ADMIN, false),
 	(c: Context) => {
 		const user = c.get("user");
-		return c.json(
+		return success(
+			c,
 			{
 				message: `Hello ${user.name}`,
 				role: user.role,
 				email: user.email,
 				id: user.id,
 			},
-			200
+			"Admin access granted"
 		);
 	}
 );
 
-// Dashboard endpoint - requires both API key and user session
+// Dashboard endpoint - requires both API key and user session (admin or user)
 app.get(
 	"/dashboard",
 	apiKeyAuth,
 	sessionAuth,
-	requireRole("user"),
+	requireRole(UserRoles.USER, true),
 	(c: Context) => {
 		const user = c.get("user");
-		return c.json({ message: `Hello ${user.name}`, role: user.role }, 200);
+		return success(
+			c,
+			{
+				message: `Welcome ${user.name}`,
+				role: user.role,
+				user: {
+					id: user.id,
+					name: user.name,
+					email: user.email,
+					role: user.role,
+				},
+			},
+			"Dashboard access granted"
+		);
 	}
 );
 
-app.get("/health", healthCheckController);
+// Global error handler
+app.onError(createErrorHandler());
 
-app.onError((err: Error, c: Context) => {
-	if (err instanceof HTTPException) {
-		return err.getResponse();
-	}
-
-	CustomLog.error({ err: err }, "Unhandled Error:");
-	return c.json({ error: "Internal Server Error" }, 500);
+// 404 handler
+app.notFound((c: Context) => {
+	CustomLog.warn({ url: c.req.url, method: c.req.method }, "Route not found");
+	return c.json(
+		{
+			success: false,
+			message: "Route not found",
+			error: {
+				code: "NOT_FOUND",
+				message: `Cannot ${c.req.method} ${c.req.url}`,
+			},
+			timestamp: new Date().toISOString(),
+		},
+		404
+	);
 });
 
 export default app;
