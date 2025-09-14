@@ -1,7 +1,7 @@
 import React from "react";
 
 export const TanStackRouterDevtools =
-	process.env.NODE_ENV === "production"
+	import.meta.env.MODE === "production"
 		? () => null // Render nothing in production
 		: React.lazy(async () => {
 				const res = await import("@tanstack/react-router-devtools");
@@ -11,7 +11,7 @@ export const TanStackRouterDevtools =
 		  }); // Lazy load in development
 
 export const ReactQueryDevtools =
-	process.env.NODE_ENV === "production"
+	import.meta.env.MODE === "production"
 		? () => null // Render nothing in production
 		: React.lazy(async () => {
 				const res = await import("@tanstack/react-query-devtools");

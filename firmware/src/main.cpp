@@ -1,98 +1,192 @@
-#include <SPI.h>
-#include <MFRC522.h>
+#include <Adafruit_Fingerprint.h>
+#include <HardwareSerial.h>
 #include <WiFiManager.h>
 #include <HTTPClient.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 
 // --- Constants ---
 const int WIFI_TIMEOUT = 180;
 const int HTTP_TIMEOUT = 10000;
 const int HTTP_CONNECT_TIMEOUT = 5000;
 const String DEFAULT_AP_NAME = "ESP32_Access_Point";
-const unsigned long CARD_READ_DELAY = 2000; // 2 second delay between card reads
+const unsigned long FINGERPRINT_READ_DELAY = 2000; // 2 second delay
 
-// --- RFID Pins ---
-#define SS_PIN 5
-#define RST_PIN 0
+// --- Fingerprint Sensor Setup ---
+HardwareSerial mySerial(2);
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
-// --- Status LED Pins (optional - uncomment if you have LEDs) ---
-// #define LED_SUCCESS 2
-// #define LED_ERROR 4
-// #define BUZZER_PIN 18
+// =========================
+// Fingerprint Attendance System
+// Main firmware for ESP32
+// =========================
+// This program manages fingerprint registration and attendance using an ESP32,
+// a fingerprint sensor, LCD display, and WiFi connection to a backend server.
+// It supports two modes: registration and attendance.
+// Serial commands allow switching modes and entering user details.
 
-MFRC522 rfid(SS_PIN, RST_PIN);
-byte nuidPICC[4];
+// --- LCD Setup ---
+LiquidCrystal_I2C lcd(0x27, 16, 2); // I2C address 0x27, 16 chars, 2 lines
 
 // --- Backend URLs ---
 String baseUrl = "http://192.168.100.4:3000";
-String registerEndpoint = "/rfid/register";
-String attendanceEndpoint = "/rfid/attendance";
-String checkEndpoint = "/rfid/check/";
+String registerEndpoint = "/fingerprint/register";
+String attendanceEndpoint = "/fingerprint/attendance";
+String checkEndpoint = "/fingerprint/check/";
+
+// --- API Key ---
+const char* apiKey = "2776f6c9816044c16543a6111545e0f2ec03eac6877f3930bf4e01e65fabcb9f";
 
 // --- Mode Control ---
 bool registerMode = false;
 String nameInput = "";
 String departmentInput = "";
-String pendingUID = "";
+uint16_t pendingFingerprintID = 0;
 bool awaitingRegistrationDetails = false;
 
 // --- Timing Control ---
-unsigned long lastCardRead = 0;
+unsigned long lastFingerprintRead = 0;
 
 WiFiManager wm;
 
+// --- LCD FUNCTIONS ---
+void lcdShowStartup() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Fingerprint Sys");
+  lcd.setCursor(0, 1);
+  lcd.print("Booting...");
+}
+
+void lcdShowWiFiConnecting() {
+  lcd.clear();
+  // Show startup message on LCD
+  lcd.setCursor(0, 0);
+  lcd.print("CONNECTING WiFi");
+  lcd.setCursor(0, 1);
+  lcd.print("-Please Wait-");
+}
+
+void lcdShowWiFiConnected() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("WiFi Connected!");
+}
+
+void lcdShowMode() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Mode:");
+  lcd.setCursor(6, 0);
+  // lcd.print(mode); // Show WiFi connected message
+  if (registerMode) {
+    lcd.print("Register");
+  } else {
+    lcd.print("Attendance");
+  }
+}
+
+void lcdShowScanPrompt() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Place Finger..."); // Show current mode (Register/Attendance)
+}
+
+void lcdShowFingerprint(uint16_t id) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("FP ID: ");
+  lcd.print(id);
+  lcd.setCursor(0, 1);
+  lcd.print("Verifying...");
+}
+
+void lcdShowAttendanceSuccess() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Attendance");
+  lcd.setCursor(0, 1);
+  lcd.print("Marked!");
+}
+
+void lcdShowRegistrationSuccess() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Registration");
+  lcd.setCursor(0, 1);
+  lcd.print("Complete!");
+}
+
+void lcdShowError(String msg) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Error!"); // Show error message
+  lcd.setCursor(0, 1);
+  lcd.print(msg);
+}
+
 // Forward declarations
 void handleSerialCommand(String cmd);
-bool checkCardRegistered(String uid);
-void registerCard(String uid, String name, String department);
-void markAttendance(String uid);
+bool checkFingerprintRegistered(uint16_t fingerprintID);
+void registerFingerprint(uint16_t fingerprintID, String name, String department);
+void markAttendance(uint16_t fingerprintID);
 void checkWiFiConnection();
 void setupHTTPClient(HTTPClient &http, String url);
-void indicateSuccess();
 void indicateError();
 void clearRegistrationData();
+uint16_t enrollNewFingerprint();
+uint16_t verifyFingerprint();
+void printMenu();
+void lcdShowAttendanceSuccess();
+void lcdShowRegistrationSuccess();
 
 void setup() {
   WiFi.mode(WIFI_STA);
   Serial.begin(115200);
+  delay(1000);
 
-  // Initialize status LEDs (uncomment if using LEDs)
-  // pinMode(LED_SUCCESS, OUTPUT);
-  // pinMode(LED_ERROR, OUTPUT);
-  // pinMode(BUZZER_PIN, OUTPUT);
+  // LCD init
+  lcd.init();
+  lcd.backlight();
+  lcdShowStartup();
 
-  // wm.resetSettings(); // Uncomment to reset WiFi settings
+  // Initialize fingerprint sensor
+  // =========================
+  // Arduino setup function
+  // =========================
+  mySerial.begin(57600, SERIAL_8N1, 16, 17); // RX=16, TX=17
+  finger.begin(57600);
 
-  // Add custom parameter for backend server configuration
-  WiFiManagerParameter custom_server("server", "Backend Server", "192.168.100.4:3000", 40);
-  wm.addParameter(&custom_server);
+  if (!finger.verifyPassword()) {
+    Serial.println("❌ Fingerprint sensor not found.");
+    lcdShowError("Sensor not found");
+    while (true) { delay(1); }
+  }
 
-  // Start SPI & RFID
-  SPI.begin();
-  rfid.PCD_Init();
+  Serial.print("✅ Fingerprint sensor detected. Capacity: ");
+  Serial.println(finger.capacity);
 
-  // Connect to WiFi using WiFi Manager
+  // Connect WiFi
+  lcdShowWiFiConnecting();
   wm.setConfigPortalTimeout(WIFI_TIMEOUT);
   if (!wm.autoConnect(DEFAULT_AP_NAME.c_str())) {
-    Serial.println("Failed to connect to WiFi. Resetting...");
-    delay(1000);
+    Serial.println("Failed to connect WiFi.");
+    lcdShowError("WiFi Failed");
+    delay(2000);
     ESP.restart();
   }
 
-  // Update base URL from custom parameter
-  String serverParam = custom_server.getValue();
-  if (serverParam.length() > 0) {
-    baseUrl = "http://" + serverParam;
-  }
+  lcdShowWiFiConnected();
 
   Serial.println("Connected to WiFi!");
   Serial.println("Backend URL: " + baseUrl);
-  Serial.println("\n=== COMMANDS ===");
-  Serial.println("mode register    - Switch to registration mode");
-  Serial.println("mode attendance  - Switch to attendance mode");
-  Serial.println("name <full name> - Set name for registration");
-  Serial.println("dept <department>- Set department for registration");
-  Serial.println("clear           - Clear registration data");
-  Serial.println("================\n");
+  Serial.println("\n=== FINGERPRINT ATTENDANCE SYSTEM ===");
+
+  // Show initial mode on LCD
+  delay(2000);
+  lcdShowMode();
+
+  printMenu();
 }
 
 void loop() {
@@ -103,103 +197,221 @@ void loop() {
     handleSerialCommand(input);
   }
 
-  // Check WiFi connection periodically
+  // WiFi connection check
   checkWiFiConnection();
 
-  // Card reading debouncing
-  if (millis() - lastCardRead < CARD_READ_DELAY) {
+  // =========================
+  // Controller main loop
+  // =========================
+
+  // Fingerprint debounce
+  if (millis() - lastFingerprintRead < FINGERPRINT_READ_DELAY) {
     return;
   }
 
-  if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
-    return;
-  }
+  // Check fingerprint
+  uint16_t fingerprintID = verifyFingerprint();
 
-  // Check if it's a new card
-  if (rfid.uid.uidByte[0] != nuidPICC[0] ||
-      rfid.uid.uidByte[1] != nuidPICC[1] ||
-      rfid.uid.uidByte[2] != nuidPICC[2] ||
-      rfid.uid.uidByte[3] != nuidPICC[3]) {
+  if (fingerprintID != 0) {
+    lastFingerprintRead = millis();
+    Serial.print("👆 Fingerprint ID: ");
+    Serial.println(fingerprintID);
 
-    lastCardRead = millis(); // Update last read time
-
-    // Store UID
-    for (byte i = 0; i < 4; i++) {
-      nuidPICC[i] = rfid.uid.uidByte[i];
-    }
-
-    // Convert UID to HEX string
-    String uidString = "";
-    for (byte i = 0; i < rfid.uid.size; i++) {
-      uidString += String(rfid.uid.uidByte[i] < 0x10 ? "0" : "");
-      uidString += String(rfid.uid.uidByte[i], HEX);
-    }
-    uidString.toUpperCase();
-
-    Serial.print("📱 Card UID: ");
-    Serial.println(uidString);
+    // Show fingerprint ID and "Verifying..." message
+    lcdShowFingerprint(fingerprintID);
+    delay(1500); // Show verifying message for 1.5 seconds
 
     if (registerMode) {
       if (nameInput == "" || departmentInput == "") {
-        Serial.println("⚠️  Please enter name and department first:");
-        Serial.println("   name John Doe");
-        Serial.println("   dept IT");
+        Serial.println("⚠️  Enter name and department.");
+        lcdShowError("Need Name/Dept");
         indicateError();
+        delay(2000);
+        lcdShowMode(); // Return to mode display
       } else {
-        registerCard(uidString, nameInput, departmentInput);
+        registerFingerprint(fingerprintID, nameInput, departmentInput);
       }
     } else {
-      if (checkCardRegistered(uidString)) {
-        markAttendance(uidString);
+      if (checkFingerprintRegistered(fingerprintID)) {
+        markAttendance(fingerprintID);
       } else {
-        Serial.println("⚠️  Card not registered. Enter name & department to register:");
-        Serial.println("   name <your name>");
-        Serial.println("   dept <your department>");
-        pendingUID = uidString;
+        Serial.println("⚠️  Fingerprint not registered.");
+        lcdShowError("Not Registered");
+        pendingFingerprintID = fingerprintID;
         awaitingRegistrationDetails = true;
         indicateError();
+        delay(2000);
+        lcdShowMode(); // Return to mode display
       }
     }
-
-  } else {
-    Serial.println("🔄 Same card detected again (ignored)");
   }
 
-  rfid.PICC_HaltA();
-  rfid.PCD_StopCrypto1();
+  delay(50);
 }
 
+// ---------------- LCD INTEGRATED LOGIC ----------------
+// (Your existing functions remain the same except now they call lcdShowX)
+
+void printMenu() {
+  Serial.println("\n=== COMMANDS ===");
+  Serial.println("mode register    - Switch to registration mode");
+  Serial.println("mode attendance  - Switch to attendance mode");
+  Serial.println("enroll           - Enroll new fingerprint");
+  Serial.println("name <full name> - Set name");
+  Serial.println("dept <dept>      - Set department");
+  Serial.println("apikey <key>     - Set API key");
+  Serial.println("clear            - Clear registration data");
+  Serial.println("menu             - Show this menu");
+  Serial.println("================\n");
+}
+
+// Print available serial commands for user
 void handleSerialCommand(String cmd) {
   if (cmd.equalsIgnoreCase("mode register")) {
     registerMode = true;
     Serial.println("✅ Switched to REGISTER mode.");
+    lcdShowMode();
+    // lcdShowMode("Register");
   } else if (cmd.equalsIgnoreCase("mode attendance")) {
     registerMode = false;
     Serial.println("✅ Switched to ATTENDANCE mode.");
+    lcdShowMode();
+    // lcdShowMode("Attendance");
+  } else if (cmd.equalsIgnoreCase("enroll")) {
+    Serial.println("📝 Starting fingerprint enrollment...");
+    uint16_t newID = enrollNewFingerprint();
+    // Handle serial commands from user
+    if (newID > 0) {
+      Serial.printf("✅ Fingerprint enrolled with ID: %d\n", newID);
+      Serial.println("Please set name and department to complete registration:");
+      Serial.println("   name <your name>");
+      Serial.println("   dept <your department>");
+      pendingFingerprintID = newID;
+      awaitingRegistrationDetails = true;
+    }
   } else if (cmd.startsWith("name ")) {
     nameInput = cmd.substring(5);
     nameInput.trim();
     Serial.printf("👤 Name set to: %s\n", nameInput.c_str());
-    if (awaitingRegistrationDetails && departmentInput != "") {
-      registerCard(pendingUID, nameInput, departmentInput);
+    if (awaitingRegistrationDetails && departmentInput != "" && pendingFingerprintID > 0) {
+      registerFingerprint(pendingFingerprintID, nameInput, departmentInput);
       awaitingRegistrationDetails = false;
-      pendingUID = "";
+      pendingFingerprintID = 0;
     }
   } else if (cmd.startsWith("dept ")) {
     departmentInput = cmd.substring(5);
     departmentInput.trim();
     Serial.printf("🏢 Department set to: %s\n", departmentInput.c_str());
-    if (awaitingRegistrationDetails && nameInput != "") {
-      registerCard(pendingUID, nameInput, departmentInput);
+    if (awaitingRegistrationDetails && nameInput != "" && pendingFingerprintID > 0) {
+      registerFingerprint(pendingFingerprintID, nameInput, departmentInput);
       awaitingRegistrationDetails = false;
-      pendingUID = "";
+      pendingFingerprintID = 0;
+    }
+  } else if (cmd.startsWith("apikey ")) {
+    String newApiKey = cmd.substring(7);
+    newApiKey.trim();
+    if (newApiKey.length() > 0) {
+      // Update the API key (note: this is temporary and will reset on restart)
+      apiKey = newApiKey.c_str();
+      Serial.printf("🔑 API key updated to: %s\n", newApiKey.c_str());
+      Serial.println("⚠️  Note: API key will reset to default on restart");
+    } else {
+      Serial.println("❌ Please provide an API key: apikey <your_key>");
     }
   } else if (cmd.equalsIgnoreCase("clear")) {
     clearRegistrationData();
     Serial.println("🧹 Registration data cleared.");
+  } else if (cmd.equalsIgnoreCase("menu")) {
+    printMenu();
   } else {
-    Serial.println("❌ Unknown command. Type 'help' for available commands.");
+    Serial.println("❌ Unknown command. Type 'menu' for available commands.");
   }
+}
+
+uint16_t enrollNewFingerprint() {
+  // Find next available ID
+  uint16_t id = 1;
+  for (uint16_t i = 1; i <= finger.capacity; i++) {
+    if (finger.loadModel(i) != FINGERPRINT_OK) {
+      id = i;
+      break;
+    }
+  }
+
+  if (id > finger.capacity) {
+    Serial.println("❌ Sensor memory full!");
+    // =========================
+    // Enroll a new fingerprint
+    // Guides user through placing finger twice and stores model
+    // Returns new fingerprint ID or 0 on error
+    return 0;
+  }
+
+  Serial.printf("Enrolling fingerprint at ID #%d\n", id);
+
+  int p = -1;
+  Serial.println("Place finger...");
+  while ((p = finger.getImage()) != FINGERPRINT_OK) {
+    delay(100);
+  }
+
+  if (finger.image2Tz(1) != FINGERPRINT_OK) {
+    Serial.println("❌ Failed at 1st image");
+    return 0;
+  }
+  Serial.println("First image taken, remove finger");
+
+  delay(2000);
+  while (finger.getImage() != FINGERPRINT_NOFINGER) {
+    delay(100);
+  }
+
+  Serial.println("Place the same finger again...");
+  while ((p = finger.getImage()) != FINGERPRINT_OK) {
+    delay(100);
+  }
+
+  if (finger.image2Tz(2) != FINGERPRINT_OK) {
+    Serial.println("❌ Failed at 2nd image");
+    return 0;
+  }
+
+  if (finger.createModel() != FINGERPRINT_OK) {
+    Serial.println("❌ Fingerprints did not match");
+    return 0;
+  }
+
+  if (finger.storeModel(id) == FINGERPRINT_OK) {
+    Serial.printf("✅ Fingerprint enrolled successfully at ID #%d\n", id);
+    return id;
+  } else {
+    Serial.println("❌ Error storing fingerprint");
+    return 0;
+  }
+}
+
+uint16_t verifyFingerprint() {
+  int p = finger.getImage();
+
+  if (p != FINGERPRINT_OK) {
+    return 0; // No finger detected
+  }
+
+  if (finger.image2Tz() != FINGERPRINT_OK) {
+    return 0; // Image conversion failed
+  }
+
+  p = finger.fingerFastSearch();
+
+  // =========================
+  // Try to verify a fingerprint
+  // Returns fingerprint ID if found, 0 otherwise
+
+  if (p == FINGERPRINT_OK) {
+    return finger.fingerID;
+  }
+
+  return 0; // No match found
 }
 
 void checkWiFiConnection() {
@@ -214,6 +426,8 @@ void checkWiFiConnection() {
 
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("📡 WiFi disconnected. Attempting to reconnect...");
+    // =========================
+    // Check WiFi connection and reconnect if needed
     WiFi.begin();
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20) {
@@ -236,17 +450,21 @@ void setupHTTPClient(HTTPClient &http, String url) {
   http.setConnectTimeout(HTTP_CONNECT_TIMEOUT);
 }
 
-bool checkCardRegistered(String uid) {
+bool checkFingerprintRegistered(uint16_t fingerprintID) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("❌ WiFi not connected!");
     indicateError();
     return false;
   }
+  // Setup HTTP client with timeouts
 
   HTTPClient http;
-  setupHTTPClient(http, baseUrl + checkEndpoint + uid);
+  setupHTTPClient(http, baseUrl + checkEndpoint + String(fingerprintID));
+  http.addHeader("X-API-Key", apiKey);  // Add API key header
 
   int httpResponseCode = http.GET();
+  // =========================
+  // Check if fingerprint is registered in backend
   bool isRegistered = false;
 
   if (httpResponseCode == 200) {
@@ -256,12 +474,12 @@ bool checkCardRegistered(String uid) {
                    (payload.indexOf("true") != -1);
 
     if (isRegistered) {
-      Serial.println("✅ Card is registered");
+      Serial.println("✅ Fingerprint is registered");
     } else {
-      Serial.println("❌ Card not found in database");
+      Serial.println("❌ Fingerprint not found in database");
     }
   } else if (httpResponseCode == 404) {
-    Serial.println("❌ Card not found in database");
+    Serial.println("❌ Fingerprint not found in database");
   } else {
     Serial.printf("❌ HTTP Error: %d\n", httpResponseCode);
     if (httpResponseCode > 0) {
@@ -274,7 +492,7 @@ bool checkCardRegistered(String uid) {
   return isRegistered;
 }
 
-void registerCard(String uid, String name, String department) {
+void registerFingerprint(uint16_t fingerprintID, String name, String department) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("❌ WiFi not connected!");
     indicateError();
@@ -284,9 +502,12 @@ void registerCard(String uid, String name, String department) {
   HTTPClient http;
   setupHTTPClient(http, baseUrl + registerEndpoint);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-API-Key", apiKey);  // Add API key header
 
-  String jsonPayload = "{\"uid\":\"" + uid + "\",\"name\":\"" + name + "\",\"department\":\"" + department + "\"}";
-  Serial.println("📤 Registering card...");
+  // =========================
+  // Register fingerprint in backend
+  String jsonPayload = "{\"fingerprintId\":\"" + String(fingerprintID) + "\",\"name\":\"" + name + "\",\"department\":\"" + department + "\"}";
+  Serial.println("📤 Registering fingerprint...");
 
   int httpResponseCode = http.POST(jsonPayload);
 
@@ -296,7 +517,12 @@ void registerCard(String uid, String name, String department) {
     if (response.length() > 0) {
       Serial.println("Server response: " + response);
     }
-    indicateSuccess();
+
+    // Show registration success message
+    lcdShowRegistrationSuccess();
+    delay(2000);
+    lcdShowMode(); // Return to mode display
+
     clearRegistrationData(); // Clear data after successful registration
   } else if (httpResponseCode > 0) {
     Serial.printf("⚠️  Registration response: HTTP %d\n", httpResponseCode);
@@ -304,16 +530,23 @@ void registerCard(String uid, String name, String department) {
     if (response.length() > 0) {
       Serial.println("Server response: " + response);
     }
+
+    lcdShowError("Reg Failed");
+    delay(2000);
+    lcdShowMode(); // Return to mode display
+
     // Don't clear data on error in case user wants to retry
   } else {
     Serial.printf("❌ Network error: %s\n", http.errorToString(httpResponseCode).c_str());
-    indicateError();
+    lcdShowError("Network Error");
+    delay(2000);
+    lcdShowMode(); // Return to mode display
   }
 
   http.end();
 }
 
-void markAttendance(String uid) {
+void markAttendance(uint16_t fingerprintID) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("❌ WiFi not connected!");
     indicateError();
@@ -323,8 +556,11 @@ void markAttendance(String uid) {
   HTTPClient http;
   setupHTTPClient(http, baseUrl + attendanceEndpoint);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-API-Key", apiKey);  // Add API key header
 
-  String jsonPayload = "{\"uid\":\"" + uid + "\"}";
+  // =========================
+  // Mark attendance in backend
+  String jsonPayload = "{\"fingerprintId\":\"" + String(fingerprintID) + "\"}";
   Serial.println("📝 Marking attendance...");
 
   int httpResponseCode = http.POST(jsonPayload);
@@ -335,16 +571,28 @@ void markAttendance(String uid) {
     if (response.length() > 0) {
       Serial.println("Server response: " + response);
     }
-    indicateSuccess();
+
+    // Show attendance success message
+    lcdShowAttendanceSuccess();
+    delay(2000);
+    lcdShowMode(); // Return to mode display
+
   } else if (httpResponseCode > 0) {
     Serial.printf("⚠️  Attendance response: HTTP %d\n", httpResponseCode);
     String response = http.getString();
     if (response.length() > 0) {
       Serial.println("Server response: " + response);
     }
+
+    lcdShowError("Att Failed");
+    delay(2000);
+    lcdShowMode(); // Return to mode display
+
   } else {
     Serial.printf("❌ Network error: %s\n", http.errorToString(httpResponseCode).c_str());
-    indicateError();
+    lcdShowError("Network Error");
+    delay(2000);
+    lcdShowMode(); // Return to mode display
   }
 
   http.end();
@@ -353,22 +601,13 @@ void markAttendance(String uid) {
 void clearRegistrationData() {
   nameInput = "";
   departmentInput = "";
-  pendingUID = "";
+  pendingFingerprintID = 0;
   awaitingRegistrationDetails = false;
 }
 
-void indicateSuccess() {
-  // Uncomment if using LEDs/buzzer
-  // digitalWrite(LED_SUCCESS, HIGH);
-  // digitalWrite(BUZZER_PIN, HIGH);
-  // delay(200);
-  // digitalWrite(LED_SUCCESS, LOW);
-  // digitalWrite(BUZZER_PIN, LOW);
-
-  Serial.println("🎉 Success!");
-}
-
 void indicateError() {
+  // Indicate error (can be extended for buzzer/LED)
+
   // Uncomment if using LEDs
   // for(int i = 0; i < 3; i++) {
   //   digitalWrite(LED_ERROR, HIGH);
@@ -379,3 +618,5 @@ void indicateError() {
 
   Serial.println("⚠️  Error occurred!");
 }
+
+// Indicate error (can be extended for buzzer/LED)

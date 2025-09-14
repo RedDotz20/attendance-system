@@ -6,6 +6,7 @@ export const env = loadEnv({
 		"MONGODB_URI",
 		"UPSTASH_REDIS_REST_URL",
 		"UPSTASH_REDIS_REST_TOKEN",
+		"API_SECRET_KEY",
 	],
 	defaults: {
 		PORT: "3000",

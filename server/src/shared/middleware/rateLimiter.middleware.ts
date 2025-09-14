@@ -26,8 +26,8 @@ export const upstashRateLimit: MiddlewareHandler = async (c, next) => {
 
 	if (sessionId) {
 		const session = await getSession(sessionId);
-		if (session?.userId?._id) {
-			keyIdentifier = `user:${session.userId._id.toString()}`;
+		if (session?.userId) {
+			keyIdentifier = `user:${session.userId.toString()}`;
 		}
 	}
 

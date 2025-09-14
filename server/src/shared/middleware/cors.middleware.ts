@@ -1,8 +1,8 @@
 import { cors } from "hono/cors";
 import { env } from "@/shared/config/env.js";
 
-const allowedOrigin = env.FRONTEND_ORIGIN;
-const isProd = env.NODE_ENV === "production";
+const allowedOrigin = env["FRONTEND_ORIGIN"] || "http://localhost:3001";
+const isProd = env["NODE_ENV"] === "production";
 
 export const corsMiddleware = cors({
 	origin: (requestOrigin) => {
@@ -20,6 +20,6 @@ export const corsMiddleware = cors({
 		return "";
 	},
 	credentials: true,
-	allowHeaders: ["Content-Type", "Authorization"],
+	allowHeaders: ["Content-Type", "Authorization", "Cookie", "x-api-key"],
 	allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 });

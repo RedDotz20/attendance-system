@@ -5,9 +5,13 @@ import "dotenv/config";
 
 export const connectDB = async (): Promise<void> => {
 	const startTime = Date.now();
-	const uri = env.MONGODB_URI;
+	const uri = env["MONGODB_URI"];
 
-	const environment = process.env.NODE_ENV || "development";
+	if (!uri) {
+		throw new Error("MONGODB_URI environment variable is required");
+	}
+
+	const environment = process.env["NODE_ENV"] || "development";
 
 	try {
 		logger.info("🔌 Connecting to MongoDB...");
@@ -38,8 +42,9 @@ export const connectDB = async (): Promise<void> => {
 		logger.info(`📂 Database: ${conn.connection.name}`);
 
 		// Optional pool size logging (if set in .env)
-		if (process.env.MONGODB_POOLSIZE) {
-			logger.info(`🧵 Max Pool Size: ${process.env.MONGODB_POOLSIZE}`);
+		const poolSize = process.env["MONGODB_POOLSIZE"];
+		if (poolSize) {
+			logger.info(`🧵 Max Pool Size: ${poolSize}`);
 		}
 	} catch (error: unknown) {
 		logger.error("❌ Failed to connect to MongoDB");

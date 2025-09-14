@@ -1,4 +1,3 @@
-import type z from "zod";
 import { useState, useEffect, useCallback } from "react";
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@/components/ui/button";
@@ -15,10 +14,10 @@ import {
 import { Eye, EyeClosed } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "./hooks/useAuth";
-import { formSchema } from "./schema/auth.schema";
+import { signInSchema, type SignInFormData } from "./schema/auth.schema";
 
 export default function AuthenticationPage() {
-	const { signIn } = useAuth();
+	const { signIn, isSignInLoading, signInError } = useAuth();
 	const [showPassword, setShowPassword] = useState(false);
 
 	const authForm = useForm({
@@ -26,18 +25,24 @@ export default function AuthenticationPage() {
 			email: "",
 			password: "",
 			rememberMe: false,
-		},
-		validators: {
-			onChange: formSchema,
-		},
-		onSubmit: async ({ value }: { value: z.infer<typeof formSchema> }) => {
-			signIn.mutate({
-				email: value.email,
-				password: value.password,
-			});
-			value.rememberMe
-				? localStorage.setItem("rememberedEmail", value.email)
-				: localStorage.removeItem("rememberedEmail");
+		} as SignInFormData,
+		validators: { onChange: signInSchema },
+		onSubmit: async ({ value }: { value: SignInFormData }) => {
+			try {
+				await signIn({
+					email: value.email,
+					password: value.password,
+				});
+
+				// Handle remember me functionality
+				if (value.rememberMe) {
+					localStorage.setItem("rememberedEmail", value.email);
+				} else {
+					localStorage.removeItem("rememberedEmail");
+				}
+			} catch (error) {
+				// Error is handled by the useAuth hook
+			}
 		},
 	});
 
@@ -101,7 +106,7 @@ export default function AuthenticationPage() {
 										value={field.state.value}
 										onChange={(e) => field.handleChange(e.target.value)}
 										onBlur={field.handleBlur}
-										disabled={signIn.isPending}
+										disabled={isSignInLoading}
 										autoFocus
 										autoComplete="email"
 									/>
@@ -124,7 +129,7 @@ export default function AuthenticationPage() {
 											className="pr-16"
 											onChange={(e) => field.handleChange(e.target.value)}
 											onBlur={field.handleBlur}
-											disabled={signIn.isPending}
+											disabled={isSignInLoading}
 											autoComplete="current-password"
 										/>
 										<Button
@@ -136,7 +141,7 @@ export default function AuthenticationPage() {
 											aria-label={
 												showPassword ? "Hide password" : "Show password"
 											}
-											disabled={signIn.isPending}
+											disabled={isSignInLoading}
 										>
 											{showPassword ? <EyeClosed /> : <Eye />}
 										</Button>
@@ -156,7 +161,7 @@ export default function AuthenticationPage() {
 											onCheckedChange={(checked) =>
 												field.handleChange(checked as boolean)
 											}
-											disabled={signIn.isPending}
+											disabled={isSignInLoading}
 										/>
 										<Label
 											htmlFor={field.name}
@@ -182,20 +187,20 @@ export default function AuthenticationPage() {
 								<Button
 									type="submit"
 									className="w-full"
-									disabled={!canSubmit || isSubmitting || signIn.isPending}
+									disabled={!canSubmit || isSubmitting || isSignInLoading}
 								>
-									{signIn.isPending ? "Signing In..." : "Sign in"}
+									{isSignInLoading ? "Signing In..." : "Sign in"}
 								</Button>
 							)}
 						</authForm.Subscribe>
 
-						{signIn.isError && (
+						{signInError && (
 							<div
 								className="text-red-600 text-sm mt-2"
 								aria-live="polite"
 								role="alert"
 							>
-								{signIn.error?.message || "Login failed"}
+								{signInError?.message || "Login failed"}
 							</div>
 						)}
 					</form>

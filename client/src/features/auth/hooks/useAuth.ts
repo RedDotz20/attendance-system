@@ -1,54 +1,150 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { authQuery } from "@/features/auth/api/queries";
-import { signInMutation, signOutMutation } from "../api/mutations";
 import { useNavigate } from "@tanstack/react-router";
 import toast from "react-hot-toast";
+import { AuthService } from "../services/auth.service";
+import type {
+	SignInCredentials,
+	SignUpCredentials,
+	AuthResponse,
+	AuthState,
+} from "../types/auth.type";
+import type { UserWithTimestamps } from "@/types/user.type";
 
+/**
+ * Authentication hook providing auth state and operations
+ */
 export const useAuth = () => {
-	const { data: session, isLoading, isError } = useQuery(authQuery);
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 
-	const signIn = useMutation({
-		...signInMutation,
-		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-			toast.success("Login Success");
-			navigate({ to: "/dashboard" });
-			// if (form.rememberMe) {
-			// 	localStorage.setItem("rememberedEmail", form.email);
-			// } else {
-			// 	localStorage.removeItem("rememberedEmail");
-			// }
-		},
-		onError: (err: any) => {
-			console.error(err.message);
-			toast.error(err.message, {
-				style: { border: "2px solid red" },
+	// Fetch current authentication state
+	const {
+		data: authData,
+		isLoading: isAuthLoading,
+		error: authError,
+	} = useQuery({
+		queryKey: AuthService.AUTH_QUERY_KEY,
+		queryFn: AuthService.getCurrentUser,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		retry: false,
+	});
+
+	/**
+	 * Handle mutation errors with consistent error display
+	 */
+	const handleError = (error: Error) => {
+		toast.error(error.message, {
+			style: { border: "2px solid red" },
+		});
+	};
+
+	/**
+	 * Handle successful authentication by updating query cache
+	 */
+	const handleAuthSuccess = (authResponse: AuthResponse) => {
+		const authState: AuthState = {
+			isAuthenticated: true,
+			user: authResponse.user,
+			...(authResponse.message && { message: authResponse.message }),
+		};
+
+		// Update query cache immediately
+		queryClient.setQueryData(AuthService.AUTH_QUERY_KEY, authState);
+	};
+
+	// Sign in mutation
+	const signInMutation = useMutation({
+		mutationKey: ["auth", "signin"],
+		mutationFn: (credentials: SignInCredentials) =>
+			AuthService.signIn(credentials),
+		onSuccess: async (authResponse: AuthResponse) => {
+			handleAuthSuccess(authResponse);
+
+			toast.success("Login successful");
+
+			// Navigate to dashboard
+			await navigate({ to: "/dashboard" });
+
+			// Invalidate queries to ensure fresh data
+			await queryClient.invalidateQueries({
+				queryKey: AuthService.AUTH_QUERY_KEY,
 			});
 		},
+		onError: handleError,
 	});
 
-	const signOut = useMutation({
-		...signOutMutation,
-		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-			navigate({ to: "/auth" });
+	// Sign up mutation
+	const signUpMutation = useMutation({
+		mutationKey: ["auth", "signup"],
+		mutationFn: (credentials: SignUpCredentials) =>
+			AuthService.signUp(credentials),
+		onSuccess: async (authResponse: AuthResponse) => {
+			handleAuthSuccess(authResponse);
+
+			toast.success("Registration successful");
+
+			// Navigate to dashboard
+			await navigate({ to: "/dashboard" });
+
+			// Invalidate queries to ensure fresh data
+			await queryClient.invalidateQueries({
+				queryKey: AuthService.AUTH_QUERY_KEY,
+			});
 		},
+		onError: handleError,
 	});
 
-	// const handleSignIn = (email: string, password: string) => {
-	// 	login.mutate({ email, password });
-	// };
+	// Sign out mutation
+	const signOutMutation = useMutation({
+		mutationKey: ["auth", "signout"],
+		mutationFn: AuthService.signOut,
+		onSuccess: async () => {
+			// Clear auth data from cache
+			queryClient.setQueryData(AuthService.AUTH_QUERY_KEY, {
+				user: null,
+				isAuthenticated: false,
+			});
 
-	// const handleSignOut = () => logout.mutate();
+			toast.success("Logged out successfully");
+
+			// Navigate to auth page
+			await navigate({ to: "/auth" });
+
+			// Invalidate all queries to clear any cached data
+			await queryClient.invalidateQueries();
+		},
+		onError: handleError,
+	});
+
+	// Computed values
+	const isAuthenticated = Boolean(authData?.user && authData.isAuthenticated);
+	const user: UserWithTimestamps | null = authData?.user || null;
+	const isLoading =
+		isAuthLoading ||
+		signInMutation.isPending ||
+		signUpMutation.isPending ||
+		signOutMutation.isPending;
 
 	return {
-		user: session?.user,
-		isAuthenticated: session?.isAuthenticated ?? false,
+		// Auth state
+		user,
+		isAuthenticated,
 		isLoading,
-		isError,
-		signIn,
-		signOut,
+		authError,
+
+		// Actions
+		signIn: signInMutation.mutateAsync,
+		signUp: signUpMutation.mutateAsync,
+		signOut: () => signOutMutation.mutate(),
+
+		// Mutation states for granular loading indicators
+		isSignInLoading: signInMutation.isPending,
+		isSignUpLoading: signUpMutation.isPending,
+		isSignOutLoading: signOutMutation.isPending,
+
+		// Mutation errors for specific error handling
+		signInError: signInMutation.error,
+		signUpError: signUpMutation.error,
+		signOutError: signOutMutation.error,
 	};
 };

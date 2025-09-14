@@ -22,6 +22,7 @@ serve(
 	{
 		fetch: app.fetch,
 		port,
+		hostname: "0.0.0.0",
 	},
 	(info) => {
 		const lanIp = getLocalIp();
