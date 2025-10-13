@@ -33,7 +33,7 @@ export class AuthService {
 	// API endpoints
 	private static readonly ENDPOINTS = {
 		SIGN_IN: "/auth/signin",
-		SIGN_UP: "/register",
+		SIGN_UP: "/auth/signup",
 		SIGN_OUT: "/auth/logout",
 		ME: "/auth/me",
 	} as const;

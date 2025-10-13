@@ -34,6 +34,12 @@ export function TopNavigation() {
 					>
 						Dashboard
 					</Link>
+					<Link
+						to="/dashboard/realtime"
+						className="text-sm font-medium hover:text-primary transition-colors"
+					>
+						Real-time
+					</Link>
 					<a
 						href="/fingerprints"
 						className="text-sm font-medium hover:text-primary transition-colors"

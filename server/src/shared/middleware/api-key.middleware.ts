@@ -10,10 +10,31 @@ export const apiKeyAuth: MiddlewareHandler = async (
 	c: Context,
 	next: Next
 ): Promise<Response | void> => {
+	// Log every request that hits this middleware
+	logger.info("🔑 API Key Middleware triggered");
+	logger.info(`   Path: ${c.req.path}`);
+	logger.info(`   Method: ${c.req.method}`);
+
 	const apiKey = c.req.header("X-API-Key");
+	logger.info(`   API Key present: ${apiKey ? "YES" : "NO"}`);
+
+	if (apiKey) {
+		logger.info(`   API Key (first 8 chars): ${apiKey.substring(0, 8)}...`);
+		logger.info(
+			`   Expected Key (first 8 chars): ${env["API_SECRET_KEY"]?.substring(
+				0,
+				8
+			) || 'undefined'}...`
+		);
+		logger.info(
+			`   Keys match: ${
+				apiKey === env["API_SECRET_KEY"] ? "YES ✅" : "NO ❌"
+			}`
+		);
+	}
 
 	if (!apiKey) {
-		logger.warn("API request attempted without API key");
+		logger.warn("⚠️  API request attempted without API key");
 		return c.json(
 			{
 				error: "API key required",
@@ -24,9 +45,10 @@ export const apiKeyAuth: MiddlewareHandler = async (
 	}
 
 	if (apiKey !== env["API_SECRET_KEY"]) {
+		logger.warn("❌ Invalid API key provided");
 		logger.warn(
 			{
-				providedKey: apiKey?.substring(0, 8) + "...", // Log only first 8 chars for security
+				providedKey: apiKey?.substring(0, 8) + "...",
 				ip: c.req.header("x-forwarded-for") || c.req.header("x-real-ip"),
 			},
 			"API request attempted with invalid API key"
@@ -40,6 +62,7 @@ export const apiKeyAuth: MiddlewareHandler = async (
 		);
 	}
 
+	logger.info("✅ Valid API key - proceeding to controller");
 	logger.info(
 		{
 			path: c.req.path,
@@ -112,9 +135,16 @@ export const apiKeyAuthFlexible: MiddlewareHandler = async (
 	c: Context,
 	next: Next
 ): Promise<Response | void> => {
+	logger.info("🔐 apiKeyAuthFlexible middleware triggered");
+	logger.info(`   📍 Path: ${c.req.path}`);
+	logger.info(`   🔧 Method: ${c.req.method}`);
+
 	const headerApiKey = c.req.header("X-API-Key");
 	const queryApiKey = c.req.query("api_key");
 	const apiKey = headerApiKey || queryApiKey;
+
+	logger.info(`   🔑 API Key from header: ${headerApiKey ? "YES" : "NO"}`);
+	logger.info(`   🔑 API Key from query: ${queryApiKey ? "YES" : "NO"}`);
 
 	if (!apiKey) {
 		logger.warn("API request attempted without API key (header or query)");

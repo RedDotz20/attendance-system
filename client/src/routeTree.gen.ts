@@ -20,6 +20,7 @@ import { Route as authAuthRouteImport } from './routes/(auth)/auth'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedFingerprintsIndexRouteImport } from './routes/_authenticated/fingerprints/index'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
+import { Route as AuthenticatedDashboardRealtimeRouteImport } from './routes/_authenticated/dashboard/realtime'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -77,6 +78,12 @@ const AuthenticatedDashboardIndexRoute =
     path: '/dashboard/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedDashboardRealtimeRoute =
+  AuthenticatedDashboardRealtimeRouteImport.update({
+    id: '/dashboard/realtime',
+    path: '/dashboard/realtime',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/dashboard/realtime': typeof AuthenticatedDashboardRealtimeRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/fingerprints': typeof AuthenticatedFingerprintsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
@@ -98,6 +106,7 @@ export interface FileRoutesByTo {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/dashboard/realtime': typeof AuthenticatedDashboardRealtimeRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/fingerprints': typeof AuthenticatedFingerprintsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
@@ -112,6 +121,7 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
+  '/_authenticated/dashboard/realtime': typeof AuthenticatedDashboardRealtimeRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/fingerprints/': typeof AuthenticatedFingerprintsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/dashboard/realtime'
     | '/dashboard'
     | '/fingerprints'
     | '/users'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/dashboard/realtime'
     | '/dashboard'
     | '/fingerprints'
     | '/users'
@@ -151,6 +163,7 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
+    | '/_authenticated/dashboard/realtime'
     | '/_authenticated/dashboard/'
     | '/_authenticated/fingerprints/'
     | '/_authenticated/users/'
@@ -246,16 +259,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/dashboard/realtime': {
+      id: '/_authenticated/dashboard/realtime'
+      path: '/dashboard/realtime'
+      fullPath: '/dashboard/realtime'
+      preLoaderRoute: typeof AuthenticatedDashboardRealtimeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedDashboardRealtimeRoute: typeof AuthenticatedDashboardRealtimeRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedFingerprintsIndexRoute: typeof AuthenticatedFingerprintsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedDashboardRealtimeRoute: AuthenticatedDashboardRealtimeRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
   AuthenticatedFingerprintsIndexRoute: AuthenticatedFingerprintsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,

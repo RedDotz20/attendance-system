@@ -7,6 +7,10 @@ declare namespace NodeJS {
 		UPSTASH_REDIS_REST_URL: string;
 		UPSTASH_REDIS_REST_TOKEN: string;
 		API_SECRET_KEY: string;
+		MQTT_BROKER_URL: string;
+		MQTT_USERNAME: string;
+		MQTT_PASSWORD: string;
+		MQTT_CLIENT_ID: string;
 		// ... add more variables needed
 	}
 }

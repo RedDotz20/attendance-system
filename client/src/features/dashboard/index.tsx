@@ -4,6 +4,8 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 export default function Dashboard() {
 	const { user, signOut } = useAuth();
 
+	console.log("this is user", user);
+
 	return (
 		<div className="container w-full flex flex-col justify center items-center bg-amber-100">
 			<h1>Hello Dashboard!</h1>

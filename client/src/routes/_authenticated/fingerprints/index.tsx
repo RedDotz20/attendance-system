@@ -33,7 +33,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LoadingPage from "@/components/LoadingPage";
-import { FingerprintRegistrationForm } from "./components/FingerprintRegistrationForm";
+// import { FingerprintRegistrationForm } from "./components/FingerprintRegistrationForm";
+import { FingerprintRegistrationForm } from "../../../components/FingerprintRegistrationForm";
 
 export const Route = createFileRoute("/_authenticated/fingerprints/")({
 	component: FingerprintsPage,

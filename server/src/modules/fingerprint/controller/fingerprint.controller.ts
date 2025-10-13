@@ -1,372 +1,248 @@
 import type { Context } from "hono";
 import { Fingerprint } from "../models/fingerprint.model.js";
 import { FingerprintAttendance } from "../models/attendance.model.js";
-import {
-	fingerprintRegistrationSchema,
-	fingerprintAttendanceSchema,
-	fingerprintIdParamSchema,
-} from "../validators/fingerprint.validator.js";
 import { logger } from "@/shared/utils/logger.js";
+import { mqttService } from "@/shared/services/mqtt.service.js";
 
 export const registerFingerprint = async (c: Context) => {
-	try {
-		const body = await c.req.json();
-		const validatedData = fingerprintRegistrationSchema.parse(body);
+    try {
+        // Log incoming request details
+        logger.info("=== FINGERPRINT REGISTRATION REQUEST ===");
+        logger.info(`Method: ${c.req.method}`);
+        logger.info(`Path: ${c.req.path}`);
+        logger.info(`Headers: ${JSON.stringify(Object.fromEntries(c.req.raw.headers))}`);
 
-		// Check if fingerprint is already registered
-		const existingFingerprint = await Fingerprint.findOne({
-			fingerprintId: validatedData.fingerprintId,
-		});
-		if (existingFingerprint) {
-			return c.json(
-				{
-					success: false,
-					message: "Fingerprint is already registered",
-					data: {
-						fingerprintId: existingFingerprint.fingerprintId,
-						name: existingFingerprint.name,
-						department: existingFingerprint.department,
-					},
-				},
-				409
-			);
-		}
+        const body = await c.req.json();
+        logger.info(`Body: ${JSON.stringify(body)}`);
 
-		// Create new fingerprint registration
-		const newFingerprint = new Fingerprint(validatedData);
-		await newFingerprint.save();
+        const { fingerprintId, name, department } = body;
 
-		logger.info(
-			{
-				action: "FINGERPRINT_REGISTRATION",
-				fingerprintId: validatedData.fingerprintId,
-				name: validatedData.name,
-				department: validatedData.department,
-			},
-			"New fingerprint registered"
-		);
+        // Check if fingerprint already exists
+        const existingFingerprint = await Fingerprint.findOne({ fingerprintId });
+        if (existingFingerprint) {
+            logger.warn(`Fingerprint ID ${fingerprintId} already registered`);
+            return c.json(
+                {
+                    error: "Fingerprint already registered",
+                    fingerprint: existingFingerprint,
+                },
+                409
+            );
+        }
 
-		return c.json(
-			{
-				success: true,
-				message: "Fingerprint registered successfully",
-				data: {
-					fingerprintId: newFingerprint.fingerprintId,
-					name: newFingerprint.name,
-					department: newFingerprint.department,
-					isActive: newFingerprint.isActive,
-					createdAt: newFingerprint.createdAt,
-				},
-			},
-			201
-		);
-	} catch (error: any) {
-		logger.error({ error: error.message }, "Error registering fingerprint");
+        // Create new fingerprint
+        const fingerprint = new Fingerprint({
+            fingerprintId,
+            name,
+            department,
+        });
 
-		if (error.name === "ZodError") {
-			return c.json(
-				{
-					success: false,
-					message: "Validation failed",
-					errors: error.errors,
-				},
-				400
-			);
-		}
+        await fingerprint.save();
+        logger.info(`✅ Fingerprint registered: ID=${fingerprintId}, Name=${name}`);
 
-		if (error.code === 11000) {
-			return c.json(
-				{
-					success: false,
-					message: "Fingerprint is already registered",
-				},
-				409
-			);
-		}
+        // Publish MQTT event for real-time updates
+        mqttService.publish("attendance/events", {
+            event_type: "registration",
+            fingerprint_id: fingerprintId,
+            name: name,
+            department: department,
+            timestamp: new Date().toISOString(),
+        });
 
-		return c.json(
-			{
-				success: false,
-				message: "Internal server error",
-			},
-			500
-		);
-	}
+        logger.info(`📡 MQTT registration event published for ${fingerprintId}`);
+
+        return c.json(
+            {
+                message: "Fingerprint registered successfully",
+                fingerprint,
+            },
+            201
+        );
+    } catch (error: any) {
+        logger.error(`❌ Registration error: ${error.message}`);
+        logger.error(`Stack: ${error.stack}`);
+        return c.json(
+            {
+                error: "Failed to register fingerprint",
+                details: error.message,
+            },
+            500
+        );
+    }
 };
 
 export const markFingerprintAttendance = async (c: Context) => {
-	try {
-		const body = await c.req.json();
-		const validatedData = fingerprintAttendanceSchema.parse(body);
+    try {
+        // Log incoming request details
+        logger.info("=== ATTENDANCE MARKING REQUEST ===");
+        logger.info(`Method: ${c.req.method}`);
+        logger.info(`Path: ${c.req.path}`);
+        logger.info(`Headers: ${JSON.stringify(Object.fromEntries(c.req.raw.headers))}`);
 
-		// Check if fingerprint is registered
-		const fingerprint = await Fingerprint.findOne({
-			fingerprintId: validatedData.fingerprintId,
-			isActive: true,
-		});
+        const body = await c.req.json();
+        logger.info(`Body: ${JSON.stringify(body)}`);
 
-		if (!fingerprint) {
-			return c.json(
-				{
-					success: false,
-					message: "Fingerprint not found or inactive",
-				},
-				404
-			);
-		}
+        const { fingerprintId } = body;
 
-		// Create attendance record
-		const attendanceRecord = new FingerprintAttendance({
-			fingerprintId: fingerprint.fingerprintId,
-			name: fingerprint.name,
-			department: fingerprint.department,
-		});
+        // Check if fingerprint is registered
+        const fingerprint = await Fingerprint.findOne({
+            fingerprintId,
+            isActive: true,
+        });
 
-		await attendanceRecord.save();
+        if (!fingerprint) {
+            logger.warn(`Attendance attempted with unregistered fingerprint: ${fingerprintId}`);
+            return c.json(
+                {
+                    error: "Fingerprint not registered",
+                    message: "Please register this fingerprint first",
+                },
+                404
+            );
+        }
 
-		logger.info(
-			{
-				action: "FINGERPRINT_ATTENDANCE_MARKED",
-				fingerprintId: fingerprint.fingerprintId,
-				name: fingerprint.name,
-				department: fingerprint.department,
-			},
-			"Fingerprint attendance marked"
-		);
+        // Create attendance record
+        const attendanceRecord = new FingerprintAttendance({
+            fingerprintId: fingerprint.fingerprintId,
+            name: fingerprint.name,
+            department: fingerprint.department,
+            timestamp: new Date(),
+        });
 
-		return c.json(
-			{
-				success: true,
-				message: "Attendance marked successfully",
-				data: {
-					fingerprintId: attendanceRecord.fingerprintId,
-					name: attendanceRecord.name,
-					department: attendanceRecord.department,
-					timestamp: attendanceRecord.timestamp,
-				},
-			},
-			201
-		);
-	} catch (error: any) {
-		logger.error(
-			{ error: error.message },
-			"Error marking fingerprint attendance"
-		);
+        await attendanceRecord.save();
+        logger.info(`✅ Attendance marked for ${fingerprint.name} (ID: ${fingerprintId})`);
 
-		if (error.name === "ZodError") {
-			return c.json(
-				{
-					success: false,
-					message: "Validation failed",
-					errors: error.errors,
-				},
-				400
-			);
-		}
+        // Publish MQTT event for real-time updates
+        mqttService.publish("attendance/events", {
+            event_type: "attendance",
+            fingerprint_id: fingerprintId,
+            name: fingerprint.name,
+            department: fingerprint.department,
+            timestamp: new Date().toISOString(),
+        });
 
-		return c.json(
-			{
-				success: false,
-				message: "Internal server error",
-			},
-			500
-		);
-	}
+        logger.info(`📡 MQTT attendance event published for ${fingerprintId}`);
+
+        return c.json(
+            {
+                message: "Attendance marked successfully",
+                attendance: attendanceRecord,
+                user: {
+                    name: fingerprint.name,
+                    department: fingerprint.department,
+                },
+            },
+            201
+        );
+    } catch (error: any) {
+        logger.error(`❌ Attendance marking error: ${error.message}`);
+        logger.error(`Stack: ${error.stack}`);
+        return c.json(
+            {
+                error: "Failed to mark attendance",
+                details: error.message,
+            },
+            500
+        );
+    }
 };
 
-export const checkFingerprint = async (c: Context) => {
-	try {
-		const { fingerprintId } = c.req.param();
-		const validatedParam = fingerprintIdParamSchema.parse({ fingerprintId });
+export const checkFingerprintRegistration = async (c: Context) => {
+    try {
+        logger.info("=== FINGERPRINT CHECK REQUEST ===");
+        const fingerprintId = c.req.param("id");
+        logger.info(`Checking fingerprint ID: ${fingerprintId}`);
 
-		const fingerprint = await Fingerprint.findOne({
-			fingerprintId: validatedParam.fingerprintId,
-			isActive: true,
-		});
+        const fingerprint = await Fingerprint.findOne({
+            fingerprintId,
+            isActive: true,
+        });
 
-		if (!fingerprint) {
-			return c.json(
-				{
-					success: false,
-					message: "Fingerprint not found",
-					registered: false,
-				},
-				404
-			);
-		}
+        if (!fingerprint) {
+            logger.info(`Fingerprint ${fingerprintId} not found or inactive`);
+            return c.json(
+                {
+                    registered: false,
+                    message: "Fingerprint not registered",
+                },
+                404
+            );
+        }
 
-		return c.json(
-			{
-				success: true,
-				message: "Fingerprint found",
-				registered: true,
-				data: {
-					fingerprintId: fingerprint.fingerprintId,
-					name: fingerprint.name,
-					department: fingerprint.department,
-					isActive: fingerprint.isActive,
-					createdAt: fingerprint.createdAt,
-				},
-			},
-			200
-		);
-	} catch (error: any) {
-		logger.error(
-			{ error: error.message, fingerprintId: c.req.param("fingerprintId") },
-			"Error checking fingerprint"
-		);
-
-		if (error.name === "ZodError") {
-			return c.json(
-				{
-					success: false,
-					message: "Invalid fingerprint ID format",
-					registered: false,
-					errors: error.errors,
-				},
-				400
-			);
-		}
-
-		return c.json(
-			{
-				success: false,
-				message: "Internal server error",
-				registered: false,
-			},
-			500
-		);
-	}
+        logger.info(`✅ Fingerprint ${fingerprintId} found: ${fingerprint.name}`);
+        return c.json(
+            {
+                registered: true,
+                fingerprint: {
+                    fingerprintId: fingerprint.fingerprintId,
+                    name: fingerprint.name,
+                    department: fingerprint.department,
+                },
+            },
+            200
+        );
+    } catch (error: any) {
+        logger.error(`❌ Check error: ${error.message}`);
+        return c.json(
+            {
+                error: "Failed to check fingerprint registration",
+                details: error.message,
+            },
+            500
+        );
+    }
 };
 
 export const getAllFingerprints = async (c: Context) => {
-	try {
-		const page = parseInt(c.req.query("page") || "1");
-		const limit = parseInt(c.req.query("limit") || "10");
-		const department = c.req.query("department");
-		const search = c.req.query("search");
+    try {
+        const fingerprints = await Fingerprint.find({ isActive: true }).sort({
+            createdAt: -1,
+        });
 
-		const filter: any = { isActive: true };
-
-		if (department) {
-			filter.department = new RegExp(department, "i");
-		}
-
-		if (search) {
-			filter.$or = [
-				{ name: new RegExp(search, "i") },
-				{ fingerprintId: new RegExp(search, "i") },
-			];
-		}
-
-		const skip = (page - 1) * limit;
-
-		const [fingerprints, total] = await Promise.all([
-			Fingerprint.find(filter)
-				.select("-__v")
-				.sort({ createdAt: -1 })
-				.skip(skip)
-				.limit(limit),
-			Fingerprint.countDocuments(filter),
-		]);
-
-		return c.json(
-			{
-				success: true,
-				message: "Fingerprints retrieved successfully",
-				data: {
-					fingerprints,
-					pagination: {
-						page,
-						limit,
-						total,
-						pages: Math.ceil(total / limit),
-					},
-				},
-			},
-			200
-		);
-	} catch (error: any) {
-		logger.error({ error: error.message }, "Error getting fingerprints");
-
-		return c.json(
-			{
-				success: false,
-				message: "Internal server error",
-			},
-			500
-		);
-	}
+        logger.info(`Retrieved ${fingerprints.length} fingerprints`);
+        return c.json(
+            {
+                message: "Fingerprints retrieved successfully",
+                count: fingerprints.length,
+                fingerprints,
+            },
+            200
+        );
+    } catch (error: any) {
+        logger.error(`Error retrieving fingerprints: ${error.message}`);
+        return c.json(
+            {
+                error: "Failed to retrieve fingerprints",
+                details: error.message,
+            },
+            500
+        );
+    }
 };
 
-export const getFingerprintAttendanceHistory = async (c: Context) => {
-	try {
-		const page = parseInt(c.req.query("page") || "1");
-		const limit = parseInt(c.req.query("limit") || "10");
-		const department = c.req.query("department");
-		const fingerprintId = c.req.query("fingerprintId");
-		const startDate = c.req.query("startDate");
-		const endDate = c.req.query("endDate");
+export const getFingerprintAttendance = async (c: Context) => {
+    try {
+        const attendance = await FingerprintAttendance.find().sort({
+            timestamp: -1,
+        });
 
-		const filter: any = {};
-
-		if (department) {
-			filter.department = new RegExp(department, "i");
-		}
-
-		if (fingerprintId) {
-			filter.fingerprintId = fingerprintId;
-		}
-
-		if (startDate || endDate) {
-			filter.timestamp = {};
-			if (startDate) {
-				filter.timestamp.$gte = new Date(startDate);
-			}
-			if (endDate) {
-				filter.timestamp.$lte = new Date(endDate);
-			}
-		}
-
-		const skip = (page - 1) * limit;
-
-		const [attendance, total] = await Promise.all([
-			FingerprintAttendance.find(filter)
-				.select("-__v")
-				.sort({ timestamp: -1 })
-				.skip(skip)
-				.limit(limit),
-			FingerprintAttendance.countDocuments(filter),
-		]);
-
-		return c.json(
-			{
-				success: true,
-				message: "Fingerprint attendance history retrieved successfully",
-				data: {
-					attendance,
-					pagination: {
-						page,
-						limit,
-						total,
-						pages: Math.ceil(total / limit),
-					},
-				},
-			},
-			200
-		);
-	} catch (error: any) {
-		logger.error(
-			{ error: error.message },
-			"Error getting fingerprint attendance history"
-		);
-
-		return c.json(
-			{
-				success: false,
-				message: "Internal server error",
-			},
-			500
-		);
-	}
+        logger.info(`Retrieved ${attendance.length} attendance records`);
+        return c.json(
+            {
+                message: "Attendance records retrieved successfully",
+                count: attendance.length,
+                attendance,
+            },
+            200
+        );
+    } catch (error: any) {
+        logger.error(`Error retrieving attendance: ${error.message}`);
+        return c.json(
+            {
+                error: "Failed to retrieve attendance records",
+                details: error.message,
+            },
+            500
+        );
+    }
 };

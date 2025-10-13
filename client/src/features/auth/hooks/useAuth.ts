@@ -65,10 +65,8 @@ export const useAuth = () => {
 			// Navigate to dashboard
 			await navigate({ to: "/dashboard" });
 
-			// Invalidate queries to ensure fresh data
-			await queryClient.invalidateQueries({
-				queryKey: AuthService.AUTH_QUERY_KEY,
-			});
+			// Don't invalidate immediately - the query data is already fresh from login
+			// The query will refetch naturally based on staleTime settings
 		},
 		onError: handleError,
 	});
@@ -86,10 +84,8 @@ export const useAuth = () => {
 			// Navigate to dashboard
 			await navigate({ to: "/dashboard" });
 
-			// Invalidate queries to ensure fresh data
-			await queryClient.invalidateQueries({
-				queryKey: AuthService.AUTH_QUERY_KEY,
-			});
+			// Don't invalidate immediately - the query data is already fresh from signup
+			// The query will refetch naturally based on staleTime settings
 		},
 		onError: handleError,
 	});

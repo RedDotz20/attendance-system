@@ -29,8 +29,6 @@
 		"allowUnreachableCode": false,
 		"forceConsistentCasingInFileNames": true,
 		"isolatedModules": true,
-
-		"baseUrl": ".",
 		"paths": {
 			"@/*": ["./src/*"]
 		}

@@ -5,6 +5,7 @@ import {
 	deleteSession,
 	getSession,
 } from "@/modules/auth/service/session.service.js";
+import { success } from "@/shared/utils/response.js";
 
 // Get User Session Status
 interface AuthStatusResponse {
@@ -25,13 +26,13 @@ export const GetSessionUserController = async (
 		const sessionId = getCookie(c, "sessionId");
 
 		if (!sessionId) {
-			return c.json<AuthStatusResponse>(
+			return success(
+				c,
 				{
 					isAuthenticated: false,
 					user: null,
-					message: "No session found",
 				},
-				200 // ✅ 200 instead of 401 for status check
+				"No session found"
 			);
 		}
 
@@ -40,13 +41,13 @@ export const GetSessionUserController = async (
 		if (!session) {
 			// Clean up invalid cookie
 			deleteCookie(c, "sessionId");
-			return c.json<AuthStatusResponse>(
+			return success(
+				c,
 				{
 					isAuthenticated: false,
 					user: null,
-					message: "Invalid or expired session",
 				},
-				200 // ✅ 200 instead of 401
+				"Invalid or expired session"
 			);
 		}
 
@@ -55,23 +56,26 @@ export const GetSessionUserController = async (
 			name: string;
 			email: string;
 			role: string;
+			createdAt: Date;
+			updatedAt: Date;
 		}>();
 
 		if (!user) {
 			// Clean up session for non-existent user
 			await deleteSession(sessionId);
 			deleteCookie(c, "sessionId");
-			return c.json<AuthStatusResponse>(
+			return success(
+				c,
 				{
 					isAuthenticated: false,
 					user: null,
-					message: "User no longer exists",
 				},
-				200 // ✅ 200 - successfully checked, user just doesn't exist
+				"User no longer exists"
 			);
 		}
 
-		return c.json<AuthStatusResponse>(
+		return success(
+			c,
 			{
 				isAuthenticated: true,
 				user: {
@@ -79,20 +83,21 @@ export const GetSessionUserController = async (
 					name: user.name,
 					email: user.email,
 					role: user.role,
+					createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : new Date().toISOString(),
+					updatedAt: user.updatedAt instanceof Date ? user.updatedAt.toISOString() : new Date().toISOString(),
 				},
-				message: "User successfully authenticated",
 			},
-			200
+			"User successfully authenticated"
 		);
 	} catch (error) {
 		console.error("Session validation error:", error);
-		return c.json<AuthStatusResponse>(
+		return success(
+			c,
 			{
 				isAuthenticated: false,
 				user: null,
-				message: "Session validation failed",
 			},
-			200 // ✅ Even errors return 200 for status checks
+			"Session validation failed"
 		);
 	}
 };

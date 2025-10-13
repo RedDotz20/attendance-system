@@ -17,6 +17,7 @@ import { fingerprint } from "./modules/fingerprint/routes/fingerprint.routes.js"
 
 // Configuration and utilities
 import { connectDB } from "./shared/config/database.js";
+import { mqttService } from "./shared/services/mqtt.service.js";
 import { upstashRateLimit } from "@/shared/middleware/rateLimiter.middleware.js";
 import {
 	sessionAuth,
@@ -40,6 +41,28 @@ app.use(logger());
 
 // Connect to database
 await connectDB();
+
+// Initialize MQTT service
+try {
+	await mqttService.connect();
+	CustomLog.info("MQTT service connected successfully");
+
+	// Register event handlers for real-time processing
+	mqttService.onAttendanceEvent((event) => {
+		CustomLog.info(
+			`Real-time attendance event received from device ${event.device_id} for fingerprint ${event.fingerprint_id}`
+		);
+		// Here you can add additional real-time processing logic
+		// such as pushing to connected WebSocket clients, updating dashboards, etc.
+	});
+
+	mqttService.onDeviceStatus((status) => {
+		CustomLog.info(`Device ${status.device_id} status: ${status.status}`);
+		// Handle device status updates
+	});
+} catch (error) {
+	CustomLog.error("Failed to initialize MQTT service");
+}
 
 // Rate limiting (enable when needed)
 // app.use("/api/*", upstashRateLimit);

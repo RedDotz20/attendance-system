@@ -15,13 +15,15 @@ import { DatabaseError, NotFoundError } from "@/shared/utils/error-handler.js";
 // Session configuration
 const SESSION_CONFIG = {
 	EXPIRY_DAYS: 7,
-	COOKIE_OPTIONS: {
+	getCookieOptions: () => ({
 		httpOnly: true,
 		secure: process.env.NODE_ENV === "production",
-		sameSite: "lax" as const,
-		maxAge: 7 * 24 * 60 * 60, // 7 days in seconds (not milliseconds)
+		// Use 'none' for cross-origin in production, 'lax' in development
+		sameSite: (process.env.NODE_ENV === "production" ? "none" : "lax") as "none" | "lax",
+		maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
 		path: "/",
-	},
+		// Note: domain is intentionally omitted to allow cookies to work on the server's domain
+	}),
 } as const;
 
 export class SessionService {
@@ -216,7 +218,7 @@ export class SessionService {
 	 * Get session cookie options
 	 */
 	getCookieOptions() {
-		return SESSION_CONFIG.COOKIE_OPTIONS;
+		return SESSION_CONFIG.getCookieOptions();
 	}
 }
 

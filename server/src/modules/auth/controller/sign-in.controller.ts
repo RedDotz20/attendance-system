@@ -117,6 +117,8 @@ export const SignInController = async (c: Context): Promise<Response> => {
 					name: user.name,
 					email: user.email,
 					role: user.role,
+					createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : new Date().toISOString(),
+					updatedAt: user.updatedAt instanceof Date ? user.updatedAt.toISOString() : new Date().toISOString(),
 				},
 				isAuthenticated: true,
 			},

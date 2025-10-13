@@ -11,9 +11,8 @@
 		"outDir": "./dist",
 		"rootDir": "src",
 		"esModuleInterop": true,
-		"baseUrl": ".",
 		"paths": {
-			"@/*": ["src/*"]
+			"@/*": ["./src/*"]
 		},
 		// Additional strict typing options
 		"noUncheckedIndexedAccess": true,
