@@ -20,4 +20,14 @@ export default defineConfig({
 	build: {
 		sourcemap: true,
 	},
+	server: {
+		port: 3001,
+		proxy: {
+			"/api": {
+				target: "http://192.168.100.4:3000",
+				changeOrigin: true,
+				rewrite: (path) => path.replace(/^\/api/, ""),
+			},
+		},
+	},
 });

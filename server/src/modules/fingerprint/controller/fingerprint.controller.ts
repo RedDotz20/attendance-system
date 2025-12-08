@@ -112,16 +112,8 @@ export const markFingerprintAttendance = async (c: Context) => {
         await attendanceRecord.save();
         logger.info(`✅ Attendance marked for ${fingerprint.name} (ID: ${fingerprintId})`);
 
-        // Publish MQTT event for real-time updates
-        mqttService.publish("attendance/events", {
-            event_type: "attendance",
-            fingerprint_id: fingerprintId,
-            name: fingerprint.name,
-            department: fingerprint.department,
-            timestamp: new Date().toISOString(),
-        });
-
-        logger.info(`📡 MQTT attendance event published for ${fingerprintId}`);
+        // Note: MQTT event is already published by the firmware device
+        // Server only creates the database record and responds to the HTTP request
 
         return c.json(
             {
@@ -222,16 +214,59 @@ export const getAllFingerprints = async (c: Context) => {
 
 export const getFingerprintAttendance = async (c: Context) => {
     try {
-        const attendance = await FingerprintAttendance.find().sort({
-            timestamp: -1,
-        });
+        const { startDate, endDate, department, fingerprintId, page = "1", limit = "50" } = c.req.query();
 
-        logger.info(`Retrieved ${attendance.length} attendance records`);
+        // Build filter query
+        const filter: any = {};
+
+        // Date range filter
+        if (startDate || endDate) {
+            filter.timestamp = {};
+            if (startDate) {
+                filter.timestamp.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                const endDateTime = new Date(endDate);
+                endDateTime.setHours(23, 59, 59, 999); // Include full end date
+                filter.timestamp.$lte = endDateTime;
+            }
+        }
+
+        // Department filter
+        if (department) {
+            filter.department = department;
+        }
+
+        // Fingerprint ID filter
+        if (fingerprintId) {
+            filter.fingerprintId = fingerprintId;
+        }
+
+        // Pagination
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        const [attendance, total] = await Promise.all([
+            FingerprintAttendance.find(filter)
+                .sort({ timestamp: -1 })
+                .skip(skip)
+                .limit(limitNum),
+            FingerprintAttendance.countDocuments(filter),
+        ]);
+
+        logger.info(`Retrieved ${attendance.length} attendance records (page ${page})`);
+
         return c.json(
             {
                 message: "Attendance records retrieved successfully",
-                count: attendance.length,
-                attendance,
+                data: attendance,
+                pagination: {
+                    currentPage: pageNum,
+                    totalPages: Math.ceil(total / limitNum),
+                    totalRecords: total,
+                    limit: limitNum,
+                },
             },
             200
         );
@@ -240,6 +275,174 @@ export const getFingerprintAttendance = async (c: Context) => {
         return c.json(
             {
                 error: "Failed to retrieve attendance records",
+                details: error.message,
+            },
+            500
+        );
+    }
+};
+
+// New endpoint: Get attendance statistics
+export const getAttendanceStats = async (c: Context) => {
+    try {
+        const { startDate, endDate, department } = c.req.query();
+
+        // Build filter query
+        const filter: any = {};
+
+        if (startDate || endDate) {
+            filter.timestamp = {};
+            if (startDate) {
+                filter.timestamp.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                const endDateTime = new Date(endDate);
+                endDateTime.setHours(23, 59, 59, 999);
+                filter.timestamp.$lte = endDateTime;
+            }
+        }
+
+        if (department) {
+            filter.department = department;
+        }
+
+        // Aggregate statistics
+        const [totalAttendance, uniqueUsers, departmentStats, dailyStats] = await Promise.all([
+            // Total attendance count
+            FingerprintAttendance.countDocuments(filter),
+
+            // Unique users count
+            FingerprintAttendance.distinct("fingerprintId", filter).then(ids => ids.length),
+
+            // Department-wise breakdown
+            FingerprintAttendance.aggregate([
+                { $match: filter },
+                {
+                    $group: {
+                        _id: "$department",
+                        count: { $sum: 1 },
+                        uniqueUsers: { $addToSet: "$fingerprintId" },
+                    },
+                },
+                {
+                    $project: {
+                        department: "$_id",
+                        count: 1,
+                        uniqueUsers: { $size: "$uniqueUsers" },
+                        _id: 0,
+                    },
+                },
+                { $sort: { count: -1 } },
+            ]),
+
+            // Daily attendance trend
+            FingerprintAttendance.aggregate([
+                { $match: filter },
+                {
+                    $group: {
+                        _id: {
+                            $dateToString: { format: "%Y-%m-%d", date: "$timestamp" },
+                        },
+                        count: { $sum: 1 },
+                        uniqueUsers: { $addToSet: "$fingerprintId" },
+                    },
+                },
+                {
+                    $project: {
+                        date: "$_id",
+                        count: 1,
+                        uniqueUsers: { $size: "$uniqueUsers" },
+                        _id: 0,
+                    },
+                },
+                { $sort: { date: 1 } },
+                { $limit: 30 }, // Last 30 days
+            ]),
+        ]);
+
+        logger.info("Attendance statistics generated successfully");
+
+        return c.json(
+            {
+                message: "Statistics retrieved successfully",
+                data: {
+                    summary: {
+                        totalAttendance,
+                        uniqueUsers,
+                    },
+                    byDepartment: departmentStats,
+                    dailyTrend: dailyStats,
+                },
+            },
+            200
+        );
+    } catch (error: any) {
+        logger.error(`Error generating statistics: ${error.message}`);
+        return c.json(
+            {
+                error: "Failed to generate statistics",
+                details: error.message,
+            },
+            500
+        );
+    }
+};
+
+// New endpoint: Get individual user attendance report
+export const getUserAttendanceReport = async (c: Context) => {
+    try {
+        const fingerprintId = c.req.param("id");
+        const { startDate, endDate } = c.req.query();
+
+        // Build filter query
+        const filter: any = { fingerprintId };
+
+        if (startDate || endDate) {
+            filter.timestamp = {};
+            if (startDate) {
+                filter.timestamp.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                const endDateTime = new Date(endDate);
+                endDateTime.setHours(23, 59, 59, 999);
+                filter.timestamp.$lte = endDateTime;
+            }
+        }
+
+        const [fingerprint, attendanceRecords, totalCount] = await Promise.all([
+            Fingerprint.findOne({ fingerprintId, isActive: true }),
+            FingerprintAttendance.find(filter).sort({ timestamp: -1 }).limit(100),
+            FingerprintAttendance.countDocuments(filter),
+        ]);
+
+        if (!fingerprint) {
+            return c.json({ error: "Fingerprint not found" }, 404);
+        }
+
+        logger.info(`Generated report for fingerprint ${fingerprintId}: ${totalCount} records`);
+
+        return c.json(
+            {
+                message: "User attendance report generated successfully",
+                data: {
+                    user: {
+                        fingerprintId: fingerprint.fingerprintId,
+                        name: fingerprint.name,
+                        department: fingerprint.department,
+                    },
+                    attendance: {
+                        total: totalCount,
+                        records: attendanceRecords,
+                    },
+                },
+            },
+            200
+        );
+    } catch (error: any) {
+        logger.error(`Error generating user report: ${error.message}`);
+        return c.json(
+            {
+                error: "Failed to generate user report",
                 details: error.message,
             },
             500

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FingerprintService } from "../services/fingerprint.service";
+import { FingerprintService, DeviceControlService } from "../services/fingerprint.service";
 import type {
 	FingerprintRegistration,
 	FingerprintAttendanceRequest,
@@ -21,6 +21,10 @@ export const fingerprintQueryKeys = {
 	attendance: () => [...fingerprintQueryKeys.all, "attendance"] as const,
 	attendanceHistory: (filters: FingerprintAttendanceFilters) =>
 		[...fingerprintQueryKeys.attendance(), filters] as const,
+	attendanceStats: (filters: any) =>
+		[...fingerprintQueryKeys.attendance(), "stats", filters] as const,
+	userReport: (id: string, filters: any) =>
+		[...fingerprintQueryKeys.attendance(), "user", id, filters] as const,
 	check: (id: string) => [...fingerprintQueryKeys.all, "check", id] as const,
 };
 
@@ -128,20 +132,35 @@ export function useMarkFingerprintAttendance() {
 /**
  * Hook to get attendance statistics
  */
-export function useFingerprintAttendanceStats(
-	startDate?: string,
-	endDate?: string
+export function useFingerprintAttendanceStats(filters: {
+	startDate?: string;
+	endDate?: string;
+	department?: string;
+} = {}) {
+	return useQuery({
+		queryKey: fingerprintQueryKeys.attendanceStats(filters),
+		queryFn: () => FingerprintService.getAttendanceStats(filters),
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		retry: 2,
+	});
+}
+
+/**
+ * Hook to get user attendance report
+ */
+export function useUserAttendanceReport(
+	fingerprintId: string,
+	filters: {
+		startDate?: string;
+		endDate?: string;
+	} = {},
+	enabled = true
 ) {
 	return useQuery({
-		queryKey: [
-			...fingerprintQueryKeys.attendance(),
-			"stats",
-			startDate,
-			endDate,
-		],
-		queryFn: () => FingerprintService.getAttendanceStats(startDate, endDate),
-		enabled: !!(startDate && endDate),
-		staleTime: 5 * 60 * 1000, // 5 minutes
+		queryKey: fingerprintQueryKeys.userReport(fingerprintId, filters),
+		queryFn: () => FingerprintService.getUserAttendanceReport(fingerprintId, filters),
+		enabled: enabled && !!fingerprintId,
+		staleTime: 3 * 60 * 1000, // 3 minutes
 		retry: 2,
 	});
 }
@@ -174,4 +193,73 @@ export function usePrefetchFingerprint() {
 		prefetchFingerprints,
 		prefetchAttendanceHistory,
 	};
+}
+
+// ============================================
+// Device Control Hooks
+// ============================================
+
+/**
+ * Hook to set device mode
+ */
+export function useSetDeviceMode() {
+	return useMutation({
+		mutationFn: ({ deviceId, mode }: { deviceId: string; mode: "register" | "attendance" }) =>
+			DeviceControlService.setDeviceMode(deviceId, mode),
+		onSuccess: (_data, variables) => {
+			toast.success(`Device mode changed to ${variables.mode}`, {
+				description: "Device will update momentarily",
+			});
+		},
+		onError: (error: Error) => {
+			toast.error("Failed to change device mode", {
+				description: error.message,
+			});
+		},
+	});
+}
+
+/**
+ * Hook to send registration data to device
+ */
+export function useSendRegistrationData() {
+	return useMutation({
+		mutationFn: ({
+			deviceId,
+			name,
+			department,
+		}: {
+			deviceId: string;
+			name: string;
+			department: string;
+		}) => DeviceControlService.sendRegistrationData(deviceId, name, department),
+		onSuccess: () => {
+			toast.success("Registration data sent to device", {
+				description: "Device is ready for fingerprint scan",
+			});
+		},
+		onError: (error: Error) => {
+			toast.error("Failed to send registration data", {
+				description: error.message,
+			});
+		},
+	});
+}
+
+/**
+ * Hook to broadcast command to all devices
+ */
+export function useBroadcastToDevices() {
+	return useMutation({
+		mutationFn: ({ command, mode }: { command: string; mode?: "register" | "attendance" }) =>
+			DeviceControlService.broadcastToAllDevices(command, mode),
+		onSuccess: () => {
+			toast.success("Command broadcast to all devices");
+		},
+		onError: (error: Error) => {
+			toast.error("Failed to broadcast command", {
+				description: error.message,
+			});
+		},
+	});
 }

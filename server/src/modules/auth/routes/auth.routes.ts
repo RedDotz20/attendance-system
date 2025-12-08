@@ -8,14 +8,14 @@ import { apiKeyAuth } from "../../../shared/middleware/api-key.middleware.js";
 
 export const auth = new Hono();
 
-// Signup requires API key to prevent unauthorized registrations
+// Signup requires API key to prevent unauthorized bot registrations (security measure)
 auth.post("/signup", apiKeyAuth, SignUpController);
 
 // Login is public - users need to be able to authenticate
 auth.post("/signin", SignInController);
 
-// Session endpoint requires API key for additional security
-auth.get("/me", apiKeyAuth, GetSessionUserController);
+// Session endpoint is protected by session cookie, no API key needed for web clients
+auth.get("/me", GetSessionUserController);
 
 // Logout is public - users should always be able to log out
 auth.post("/logout", SignOutController);

@@ -27,16 +27,22 @@ const queryClient = new QueryClient({
 				// eslint-disable-next-line no-console
 				if (import.meta.env.DEV) console.log({ failureCount, error });
 
-				if (failureCount >= 0 && import.meta.env.DEV) return false;
-				if (failureCount > 3 && import.meta.env.PROD) return false;
-
-				return !(
+				// Don't retry auth failures or forbidden errors
+				if (
 					error instanceof AxiosError &&
-					[401, 403].includes(error.response?.status ?? 0)
-				);
+					[401, 403, 404].includes(error.response?.status ?? 0)
+				) {
+					return false;
+				}
+
+				// Retry up to 2 times for other errors
+				return failureCount < 2;
 			},
-			refetchOnWindowFocus: import.meta.env.PROD,
-			staleTime: 10 * 1000, // 10s
+			refetchOnWindowFocus: false, // Don't refetch on window focus to prevent logout
+			refetchOnMount: true, // Refetch when component mounts
+			refetchOnReconnect: true, // Refetch when network reconnects
+			staleTime: 5 * 60 * 1000, // 5 minutes - keep auth data fresh but not overly aggressive
+			gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache longer
 		},
 		mutations: {
 			onError: (error) => {

@@ -1,5 +1,6 @@
 import { redirect } from "@tanstack/react-router";
 import { ApiClient } from "@/lib/api-client";
+import apiAuth from "@/lib/axios-auth";
 import type {
 	AuthState,
 	AuthResponse,
@@ -11,12 +12,16 @@ import type {
 /**
  * Standalone function to fetch current user data from API
  * This is separate from the class to avoid 'this' context issues in React Query
+ * Returns unauthenticated state instead of throwing on auth failure
  */
 const fetchCurrentUserData = async (): Promise<AuthState> => {
 	try {
-		return await ApiClient.get<AuthState>("/auth/me");
+		const response = await ApiClient.get<AuthState>("/auth/me");
+		// Server returns success with isAuthenticated: false if no session
+		return response;
 	} catch (error) {
-		// Authentication check failed, return unauthenticated state
+		// On any error (network, server down, etc), return unauthenticated
+		console.warn("Auth check failed:", error);
 		return {
 			user: null,
 			isAuthenticated: false,
@@ -49,13 +54,15 @@ export class AuthService {
 	}
 
 	/**
-	 * Register new user
+	 * Register new user (requires API key)
 	 */
 	static async signUp(credentials: SignUpCredentials): Promise<AuthResponse> {
-		return ApiClient.post<AuthResponse, SignUpCredentials>(
+		// Use apiAuth which includes API key header
+		const response = await apiAuth.post<{ success: boolean; data: AuthResponse }>(
 			AuthService.ENDPOINTS.SIGN_UP,
 			credentials
 		);
+		return response.data.data;
 	}
 
 	/**

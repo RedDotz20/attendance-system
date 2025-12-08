@@ -17,12 +17,13 @@ const SESSION_CONFIG = {
 	EXPIRY_DAYS: 7,
 	getCookieOptions: () => ({
 		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
-		// Use 'none' for cross-origin in production, 'lax' in development
-		sameSite: (process.env.NODE_ENV === "production" ? "none" : "lax") as "none" | "lax",
+		// Always use secure: false in development with IP addresses
+		secure: false,
+		// Use 'lax' for better compatibility with IP addresses
+		sameSite: "lax" as const,
 		maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
 		path: "/",
-		// Note: domain is intentionally omitted to allow cookies to work on the server's domain
+		// Domain is omitted to work with both localhost and IP addresses
 	}),
 } as const;
 

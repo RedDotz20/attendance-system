@@ -1,4 +1,4 @@
-import { ApiClient } from "@/lib/api-client";
+import { ApiFingerprintClient } from "@/lib/api-fingerprint-client";
 import type {
 	Fingerprint,
 	FingerprintRegistration,
@@ -12,6 +12,7 @@ import type { PaginatedResponse } from "@/types/api";
 
 /**
  * Fingerprint API service for managing fingerprint operations
+ * Uses ApiFingerprintClient which includes API key authentication
  */
 export class FingerprintService {
 	private static readonly BASE_URL = "/fingerprint";
@@ -22,7 +23,7 @@ export class FingerprintService {
 	static async registerFingerprint(
 		data: FingerprintRegistration
 	): Promise<Fingerprint> {
-		return ApiClient.post<Fingerprint, FingerprintRegistration>(
+		return ApiFingerprintClient.post<Fingerprint, FingerprintRegistration>(
 			`${this.BASE_URL}/register`,
 			data
 		);
@@ -34,7 +35,7 @@ export class FingerprintService {
 	static async markAttendance(
 		data: FingerprintAttendanceRequest
 	): Promise<FingerprintAttendance> {
-		return ApiClient.post<FingerprintAttendance, FingerprintAttendanceRequest>(
+		return ApiFingerprintClient.post<FingerprintAttendance, FingerprintAttendanceRequest>(
 			`${this.BASE_URL}/attendance`,
 			data
 		);
@@ -46,7 +47,7 @@ export class FingerprintService {
 	static async checkFingerprint(
 		fingerprintId: string
 	): Promise<FingerprintCheckResponse> {
-		return ApiClient.get<FingerprintCheckResponse>(
+		return ApiFingerprintClient.get<FingerprintCheckResponse>(
 			`${this.BASE_URL}/check/${fingerprintId}`
 		);
 	}
@@ -77,7 +78,7 @@ export class FingerprintService {
 			? `${this.BASE_URL}/fingerprints?${queryString}`
 			: `${this.BASE_URL}/fingerprints`;
 
-		return ApiClient.get<PaginatedResponse<Fingerprint>>(url);
+		return ApiFingerprintClient.get<PaginatedResponse<Fingerprint>>(url);
 	}
 
 	/**
@@ -112,41 +113,147 @@ export class FingerprintService {
 			? `${this.BASE_URL}/attendance?${queryString}`
 			: `${this.BASE_URL}/attendance`;
 
-		return ApiClient.get<PaginatedResponse<FingerprintAttendance>>(url);
+		return ApiFingerprintClient.get<PaginatedResponse<FingerprintAttendance>>(url);
 	}
 
 	/**
 	 * Get attendance statistics for a specific period
 	 */
-	static async getAttendanceStats(
-		startDate?: string,
-		endDate?: string
-	): Promise<{
-		totalAttendance: number;
-		uniqueEmployees: number;
-		departmentStats: Array<{
+	static async getAttendanceStats(filters: {
+		startDate?: string;
+		endDate?: string;
+		department?: string;
+	} = {}): Promise<{
+		summary: {
+			totalAttendance: number;
+			uniqueUsers: number;
+		};
+		byDepartment: Array<{
 			department: string;
 			count: number;
+			uniqueUsers: number;
 		}>;
-		dailyStats: Array<{
+		dailyTrend: Array<{
 			date: string;
 			count: number;
+			uniqueUsers: number;
 		}>;
 	}> {
 		const searchParams = new URLSearchParams();
 
-		if (startDate) {
-			searchParams.append("startDate", startDate);
+		if (filters.startDate) {
+			searchParams.append("startDate", filters.startDate);
 		}
-		if (endDate) {
-			searchParams.append("endDate", endDate);
+		if (filters.endDate) {
+			searchParams.append("endDate", filters.endDate);
+		}
+		if (filters.department) {
+			searchParams.append("department", filters.department);
 		}
 
 		const queryString = searchParams.toString();
 		const url = queryString
-			? `${this.BASE_URL}/stats?${queryString}`
-			: `${this.BASE_URL}/stats`;
+			? `${this.BASE_URL}/attendance/stats?${queryString}`
+			: `${this.BASE_URL}/attendance/stats`;
 
-		return ApiClient.get(url);
+		const response = await ApiFingerprintClient.get<{ data: any }>(url);
+		return response.data;
+	}
+
+	/**
+	 * Get individual user attendance report
+	 */
+	static async getUserAttendanceReport(
+		fingerprintId: string,
+		filters: {
+			startDate?: string;
+			endDate?: string;
+		} = {}
+	): Promise<{
+		user: {
+			fingerprintId: string;
+			name: string;
+			department: string;
+		};
+		attendance: {
+			total: number;
+			records: FingerprintAttendance[];
+		};
+	}> {
+		const searchParams = new URLSearchParams();
+
+		if (filters.startDate) {
+			searchParams.append("startDate", filters.startDate);
+		}
+		if (filters.endDate) {
+			searchParams.append("endDate", filters.endDate);
+		}
+
+		const queryString = searchParams.toString();
+		const url = queryString
+			? `${this.BASE_URL}/attendance/user/${fingerprintId}?${queryString}`
+			: `${this.BASE_URL}/attendance/user/${fingerprintId}`;
+
+		const response = await ApiFingerprintClient.get<{ data: any }>(url);
+		return response.data;
+	}
+}
+
+/**
+ * Device Control API service
+ * Uses ApiFingerprintClient which includes API key authentication
+ */
+export class DeviceControlService {
+	private static readonly BASE_URL = "/fingerprint/device";
+
+	/**
+	 * Set device mode (register or attendance)
+	 */
+	static async setDeviceMode(
+		deviceId: string,
+		mode: "register" | "attendance"
+	): Promise<{ message: string; data: any }> {
+		return ApiFingerprintClient.post<
+			{ message: string; data: any },
+			{ deviceId: string; mode: string }
+		>(`${this.BASE_URL}/mode`, { deviceId, mode });
+	}
+
+	/**
+	 * Request device status
+	 */
+	static async getDeviceStatus(deviceId: string): Promise<{ message: string; data: any }> {
+		return ApiFingerprintClient.get<{ message: string; data: any }>(
+			`${this.BASE_URL}/status/${deviceId}`
+		);
+	}
+
+	/**
+	 * Send registration data to device
+	 */
+	static async sendRegistrationData(
+		deviceId: string,
+		name: string,
+		department: string
+	): Promise<{ message: string; data: any }> {
+		return ApiFingerprintClient.post<
+			{ message: string; data: any },
+			{ deviceId: string; name: string; department: string }
+		>(`${this.BASE_URL}/registration-data`, { deviceId, name, department });
+	}
+
+	/**
+	 * Broadcast command to all devices
+	 */
+	static async broadcastToAllDevices(
+		command: string,
+		mode?: "register" | "attendance"
+	): Promise<{ message: string; data: any }> {
+		const payload: { command: string; mode?: string } = { command };
+		if (mode !== undefined) payload.mode = mode;
+		return ApiFingerprintClient.post<
+			{ message: string; data: any },
+			{ command: string; mode?: string }
+		>(`${this.BASE_URL}/broadcast`, payload);
 	}
 }

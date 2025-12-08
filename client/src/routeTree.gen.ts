@@ -21,6 +21,8 @@ import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedFingerprintsIndexRouteImport } from './routes/_authenticated/fingerprints/index'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
 import { Route as AuthenticatedDashboardRealtimeRouteImport } from './routes/_authenticated/dashboard/realtime'
+import { Route as AuthenticatedDashboardDeviceControlRouteImport } from './routes/_authenticated/dashboard/device-control'
+import { Route as AuthenticatedDashboardAnalyticsRouteImport } from './routes/_authenticated/dashboard/analytics'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -84,6 +86,18 @@ const AuthenticatedDashboardRealtimeRoute =
     path: '/dashboard/realtime',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedDashboardDeviceControlRoute =
+  AuthenticatedDashboardDeviceControlRouteImport.update({
+    id: '/dashboard/device-control',
+    path: '/dashboard/device-control',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedDashboardAnalyticsRoute =
+  AuthenticatedDashboardAnalyticsRouteImport.update({
+    id: '/dashboard/analytics',
+    path: '/dashboard/analytics',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -93,6 +107,8 @@ export interface FileRoutesByFullPath {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/dashboard/analytics': typeof AuthenticatedDashboardAnalyticsRoute
+  '/dashboard/device-control': typeof AuthenticatedDashboardDeviceControlRoute
   '/dashboard/realtime': typeof AuthenticatedDashboardRealtimeRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/fingerprints': typeof AuthenticatedFingerprintsIndexRoute
@@ -106,6 +122,8 @@ export interface FileRoutesByTo {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/dashboard/analytics': typeof AuthenticatedDashboardAnalyticsRoute
+  '/dashboard/device-control': typeof AuthenticatedDashboardDeviceControlRoute
   '/dashboard/realtime': typeof AuthenticatedDashboardRealtimeRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/fingerprints': typeof AuthenticatedFingerprintsIndexRoute
@@ -121,6 +139,8 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
+  '/_authenticated/dashboard/analytics': typeof AuthenticatedDashboardAnalyticsRoute
+  '/_authenticated/dashboard/device-control': typeof AuthenticatedDashboardDeviceControlRoute
   '/_authenticated/dashboard/realtime': typeof AuthenticatedDashboardRealtimeRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/fingerprints/': typeof AuthenticatedFingerprintsIndexRoute
@@ -136,6 +156,8 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/dashboard/analytics'
+    | '/dashboard/device-control'
     | '/dashboard/realtime'
     | '/dashboard'
     | '/fingerprints'
@@ -149,6 +171,8 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/dashboard/analytics'
+    | '/dashboard/device-control'
     | '/dashboard/realtime'
     | '/dashboard'
     | '/fingerprints'
@@ -163,6 +187,8 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
+    | '/_authenticated/dashboard/analytics'
+    | '/_authenticated/dashboard/device-control'
     | '/_authenticated/dashboard/realtime'
     | '/_authenticated/dashboard/'
     | '/_authenticated/fingerprints/'
@@ -266,10 +292,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRealtimeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/dashboard/device-control': {
+      id: '/_authenticated/dashboard/device-control'
+      path: '/dashboard/device-control'
+      fullPath: '/dashboard/device-control'
+      preLoaderRoute: typeof AuthenticatedDashboardDeviceControlRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard/analytics': {
+      id: '/_authenticated/dashboard/analytics'
+      path: '/dashboard/analytics'
+      fullPath: '/dashboard/analytics'
+      preLoaderRoute: typeof AuthenticatedDashboardAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedDashboardAnalyticsRoute: typeof AuthenticatedDashboardAnalyticsRoute
+  AuthenticatedDashboardDeviceControlRoute: typeof AuthenticatedDashboardDeviceControlRoute
   AuthenticatedDashboardRealtimeRoute: typeof AuthenticatedDashboardRealtimeRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedFingerprintsIndexRoute: typeof AuthenticatedFingerprintsIndexRoute
@@ -277,6 +319,9 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedDashboardAnalyticsRoute: AuthenticatedDashboardAnalyticsRoute,
+  AuthenticatedDashboardDeviceControlRoute:
+    AuthenticatedDashboardDeviceControlRoute,
   AuthenticatedDashboardRealtimeRoute: AuthenticatedDashboardRealtimeRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
   AuthenticatedFingerprintsIndexRoute: AuthenticatedFingerprintsIndexRoute,

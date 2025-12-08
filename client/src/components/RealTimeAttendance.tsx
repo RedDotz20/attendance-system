@@ -174,6 +174,22 @@ export const RealTimeAttendance: React.FC = () => {
 		};
 
 		setEvents((prevEvents) => {
+			// Deduplication: Check if an identical event already exists within the last 5 seconds
+			// Matches on fingerprint_id, event_type, and timestamp window
+			const isDuplicate = prevEvents.some(
+				(existingEvent) =>
+					existingEvent.fingerprint_id === event.fingerprint_id &&
+					existingEvent.event_type === event.event_type &&
+					Math.abs(event.timestamp - existingEvent.timestamp) < 5000 // Within 5 seconds
+			);
+
+			if (isDuplicate) {
+				console.log(
+					`Duplicate attendance event for fingerprint ${event.fingerprint_id}, skipping...`
+				);
+				return prevEvents;
+			}
+
 			const newEvents = [event, ...prevEvents];
 			// Keep only the last 50 events to prevent memory issues
 			return newEvents.slice(0, 50);

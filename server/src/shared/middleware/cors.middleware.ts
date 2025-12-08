@@ -11,15 +11,15 @@ export const corsMiddleware = cors({
 		// Match request origin with allowed origin explicitly
 		if (requestOrigin === allowedOrigin) return requestOrigin;
 
-		// Allow localhost in dev if needed
-		if (!isProd && requestOrigin.startsWith("http://localhost")) {
+		// Allow localhost and 192.168.x.x in dev
+		if (!isProd && (requestOrigin.startsWith("http://localhost") || requestOrigin.startsWith("http://127.0.0.1") || requestOrigin.match(/^http:\/\/192\.168\.\d+\.\d+/))) {
 			return requestOrigin;
 		}
 
-		// Deny if it doesn’t match
+		// Deny if it doesn't match
 		return "";
 	},
 	credentials: true,
-	allowHeaders: ["Content-Type", "Authorization", "Cookie", "x-api-key"],
+	allowHeaders: ["Content-Type", "Authorization", "Cookie", "x-api-key", "X-API-Key"],
 	allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 });

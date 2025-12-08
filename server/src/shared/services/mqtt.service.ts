@@ -113,7 +113,11 @@ export class MQTTService {
 	private subscribeToTopics(): void {
 		if (!this.client || !this.isConnected) return;
 
-		const topics = ["attendance/events", "attendance/device/status"];
+		const topics = [
+			"attendance/events",
+			"attendance/device/status",
+			"attendance/device/response", // Device responses to commands
+		];
 
 		topics.forEach((topic) => {
 			this.client!.subscribe(topic, (err) => {
@@ -142,6 +146,9 @@ export class MQTTService {
 					break;
 				case "attendance/device/status":
 					this.handleDeviceStatus(data);
+					break;
+				case "attendance/device/response":
+					this.handleDeviceResponse(data);
 					break;
 				default:
 					logger.warn(`Received message from unknown topic: ${topic}`);
@@ -211,6 +218,24 @@ export class MQTTService {
 			});
 		} catch (error) {
 			logger.error("Failed to process device status");
+		}
+	}
+
+	/**
+	 * Handle device response (to commands)
+	 */
+	private handleDeviceResponse(data: any): void {
+		try {
+			logger.info(
+				`Device response received from ${data.device_id}: ${data.message || data.status}`
+			);
+
+			// Log the full response for debugging
+			logger.info({ response: data }, "Device response details");
+
+			// You can add specific response handlers here if needed
+		} catch (error) {
+			logger.error("Failed to process device response");
 		}
 	}
 

@@ -5,7 +5,15 @@ import {
 	checkFingerprintRegistration,
 	getAllFingerprints,
 	getFingerprintAttendance,
+	getAttendanceStats,
+	getUserAttendanceReport,
 } from "../controller/fingerprint.controller.js";
+import {
+	setDeviceMode,
+	getDeviceStatus,
+	sendRegistrationData,
+	broadcastToAllDevices,
+} from "../controller/device.controller.js";
 import {
 	apiKeyAuthFlexible,
 	apiKeyAuth,
@@ -36,4 +44,14 @@ fingerprint.get("/check/:id", apiKeyAuthFlexible, checkFingerprintRegistration);
 
 // Admin endpoints for web dashboard - require API key in header
 fingerprint.get("/fingerprints", apiKeyAuth, getAllFingerprints);
-fingerprint.get("/attendance", apiKeyAuth, getFingerprintAttendance);
+
+// Attendance management endpoints
+fingerprint.get("/attendance", apiKeyAuth, getFingerprintAttendance); // With filters & pagination
+fingerprint.get("/attendance/stats", apiKeyAuth, getAttendanceStats); // Statistics & analytics
+fingerprint.get("/attendance/user/:id", apiKeyAuth, getUserAttendanceReport); // User-specific report
+
+// Device control endpoints - require API key in header
+fingerprint.post("/device/mode", apiKeyAuth, setDeviceMode); // Set device mode (register/attendance)
+fingerprint.get("/device/status/:deviceId", apiKeyAuth, getDeviceStatus); // Request device status
+fingerprint.post("/device/registration-data", apiKeyAuth, sendRegistrationData); // Send registration data to device
+fingerprint.post("/device/broadcast", apiKeyAuth, broadcastToAllDevices); // Broadcast command to all devices

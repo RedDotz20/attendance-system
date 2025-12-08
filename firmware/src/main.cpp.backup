@@ -270,12 +270,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       String dept = doc["department"] | "";
 
       if (name.length() > 0 && dept.length() > 0) {
-        // Automatically switch to register mode for this enrollment
-        registerMode = true;
         nameInput = name;
         departmentInput = dept;
         Serial.println("✅ Registration data received via MQTT");
-        Serial.println("🔄 Auto-switched to REGISTER mode");
         Serial.println("Name: " + nameInput);
         Serial.println("Dept: " + departmentInput);
 
@@ -514,48 +511,7 @@ void loop() {
     return;
   }
 
-  // Skip fingerprint verification if we're currently in the middle of auto-enrollment
-  // to avoid search errors while the sensor is busy with enrollment operations
-  if (isAutoEnrolling) {
-    return;
-  }
-
-  // In REGISTER mode with name/department set, skip verification and go directly to enrollment
-  // This prevents unnecessary "not found" errors when we're trying to register a NEW fingerprint
-  if (registerMode && nameInput != "" && departmentInput != "" && !isAutoEnrolling) {
-    isAutoEnrolling = true;
-    Serial.println("📝 Registration mode active - starting enrollment for new user...");
-    Serial.println("Name: " + nameInput);
-    Serial.println("Dept: " + departmentInput);
-
-    uint16_t newId = enrollNewFingerprint();
-
-    if (newId > 0) {
-      pendingFingerprintID = newId;
-      awaitingRegistrationDetails = false;
-      Serial.printf("✅ Enrolled new ID: %d; registering with server...\n", newId);
-
-      // Give sensor time to complete internal operations before registering
-      Serial.println("⏳ Waiting for sensor to finalize enrollment...");
-      delay(1000);
-
-      registerFingerprint(newId, nameInput, departmentInput);
-
-      // Longer cooldown after successful enrollment to prevent immediate re-detection
-      lastFingerprintRead = millis();
-      delay(2000);  // 2 second grace period after registration
-    } else {
-      Serial.println("❌ Auto-enroll failed or timed out; will retry on next attempt.");
-      lcdShowError("Enroll failed");
-      delay(1500);
-      lcdShowMode();
-    }
-    // Reset auto-enroll flag
-    isAutoEnrolling = false;
-    return;  // Skip the rest of the loop
-  }
-
-  // Check fingerprint (only in attendance mode or register mode without name/dept set)
+  // Check fingerprint
   uint16_t fingerprintID = verifyFingerprint();
   if (fingerprintID != 0) {
     lastFingerprintRead = millis();
@@ -565,15 +521,19 @@ void loop() {
     delay(1500);
 
     if (registerMode) {
-      // In register mode WITHOUT name/dept: this shouldn't happen in web workflow
-      // but keep for serial command compatibility
-      Serial.println("⚠️  Enter name and department first.");
-      Serial.println("Commands: name <your name>");
-      Serial.println("          dept <your department>");
-      lcdShowError("Need Name/Dept");
-      indicateError();
-      delay(2000);
-      lcdShowMode();
+      // In register mode: register this fingerprint to server
+      if (nameInput == "" || departmentInput == "") {
+        Serial.println("⚠️  Enter name and department first.");
+        Serial.println("Commands: name <your name>");
+        Serial.println("          dept <your department>");
+        lcdShowError("Need Name/Dept");
+        indicateError();
+        delay(2000);
+        lcdShowMode();
+      } else {
+        Serial.println("📡 Registering existing fingerprint to server...");
+        registerFingerprint(fingerprintID, nameInput, departmentInput);
+      }
     } else {
       // In attendance mode: check if registered and mark attendance
       if (checkFingerprintRegistered(fingerprintID)) {
@@ -589,8 +549,33 @@ void loop() {
         lcdShowMode();
       }
     }
+  } else {
+    // No recognized fingerprint; in register mode with data set, auto-enroll the next finger
+    if (registerMode && nameInput != "" && departmentInput != "" && !isAutoEnrolling) {
+      isAutoEnrolling = true;
+      Serial.println("8 Auto-enroll flow starting (name/dept already set). Place finger when prompted...");
+      uint16_t newId = enrollNewFingerprint();
+
+      if (newId > 0) {
+        pendingFingerprintID = newId;
+        awaitingRegistrationDetails = false;
+        Serial.printf("7 Enrolled new ID: %d; registering with server...\n", newId);
+        
+        // Give sensor time to complete internal operations before registering
+        Serial.println("Waiting for sensor to finalize enrollment...");
+        delay(1000);
+        registerFingerprint(newId, nameInput, departmentInput);
+        Serial.println("0 Auto-enroll failed or timed out; will retry on next attempt.");
+        lcdShowError("Enroll failed");
+        delay(1500);
+        lcdShowMode();
+      }
+
+      // small cooldown to avoid hammering enroll in tight loop
+      lastFingerprintRead = millis();
+      isAutoEnrolling = false;
+    }
   }
-  // If no finger detected in attendance mode, just wait for next loop iteration
 
   delay(50);
 }
@@ -900,11 +885,11 @@ uint16_t enrollNewFingerprint() {
     lcd.setCursor(0, 1);
     lcd.print("ID: " + String(id));
     delay(2000);
-
+    
     // Wait for sensor to complete internal flash operations
     Serial.println("Waiting for sensor to finalize storage...");
     delay(500);
-
+    
     return id;
   } else {
     Serial.printf("❌ Error storing fingerprint: code=%d\n", p);
@@ -1098,11 +1083,6 @@ void registerFingerprint(uint16_t fingerprintID, String name, String department)
     if (response.length() > 0) Serial.println("Server response: " + response);
     lcdShowRegistrationSuccess();
     delay(3000);
-
-    // Auto-switch back to attendance mode after successful registration
-    registerMode = false;
-    Serial.println("🔄 Auto-switched back to ATTENDANCE mode");
-
     lcdShowMode();
     clearRegistrationData();
   } else if (httpResponseCode > 0) {
@@ -1124,7 +1104,7 @@ void registerFingerprint(uint16_t fingerprintID, String name, String department)
 void markAttendance(uint16_t fingerprintID) {
   if (WiFi.status() != WL_CONNECTED) { Serial.println("❌ WiFi not connected!"); indicateError(); return; }
   Serial.println("📡 Publishing MQTT attendance event...");
-  publishAttendanceEvent(fingerprintID, nameInput, departmentInput);
+  publishAttendanceEvent(fingerprintID);
   HTTPClient http;
   setupHTTPClient(http, baseUrl + attendanceEndpoint);
   http.addHeader("Content-Type", "application/json");
