@@ -7,6 +7,9 @@ import type {
 	FingerprintCheckResponse,
 	FingerprintListFilters,
 	FingerprintAttendanceFilters,
+	FingerprintListResponse,
+	AttendanceLogFilters,
+	AttendanceLog,
 } from "@/types/fingerprint.type";
 import type { PaginatedResponse } from "@/types/api";
 
@@ -57,7 +60,7 @@ export class FingerprintService {
 	 */
 	static async getAllFingerprints(
 		filters: FingerprintListFilters = {}
-	): Promise<PaginatedResponse<Fingerprint>> {
+	): Promise<FingerprintListResponse> {
 		const searchParams = new URLSearchParams();
 
 		if (filters.department) {
@@ -78,7 +81,7 @@ export class FingerprintService {
 			? `${this.BASE_URL}/fingerprints?${queryString}`
 			: `${this.BASE_URL}/fingerprints`;
 
-		return ApiFingerprintClient.get<PaginatedResponse<Fingerprint>>(url);
+		return ApiFingerprintClient.get<FingerprintListResponse>(url);
 	}
 
 	/**
@@ -196,6 +199,39 @@ export class FingerprintService {
 
 		const response = await ApiFingerprintClient.get<{ data: any }>(url);
 		return response.data;
+	}
+
+	/**
+	 * Get attendance logs (real-time events with pagination)
+	 */
+	static async getAttendanceLogs(
+		filters: AttendanceLogFilters = {}
+	): Promise<PaginatedResponse<AttendanceLog>> {
+		const searchParams = new URLSearchParams();
+
+		if (filters.startDate) {
+			searchParams.append("startDate", filters.startDate);
+		}
+		if (filters.endDate) {
+			searchParams.append("endDate", filters.endDate);
+		}
+		if (filters.department) {
+			searchParams.append("department", filters.department);
+		}
+		if (filters.eventType) {
+			searchParams.append("eventType", filters.eventType);
+		}
+		if (filters.page) {
+			searchParams.append("page", filters.page.toString());
+		}
+		if (filters.limit) {
+			searchParams.append("limit", filters.limit.toString());
+		}
+
+		const queryString = searchParams.toString();
+		const url = queryString ? `${this.BASE_URL}/logs?${queryString}` : `${this.BASE_URL}/logs`;
+
+		return ApiFingerprintClient.get<PaginatedResponse<AttendanceLog>>(url);
 	}
 }
 

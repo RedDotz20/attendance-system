@@ -1,8 +1,13 @@
 import type { Context } from "hono";
 import { Fingerprint } from "../models/fingerprint.model.js";
 import { FingerprintAttendance } from "../models/attendance.model.js";
+import { AttendanceLog } from "../models/attendance-log.model.js";
 import { logger } from "@/shared/utils/logger.js";
 import { mqttService } from "@/shared/services/mqtt.service.js";
+import {
+    fingerprintRegistrationSchema,
+    fingerprintAttendanceSchema,
+} from "../validators/fingerprint.validator.js";
 
 export const registerFingerprint = async (c: Context) => {
     try {
@@ -15,7 +20,20 @@ export const registerFingerprint = async (c: Context) => {
         const body = await c.req.json();
         logger.info(`Body: ${JSON.stringify(body)}`);
 
-        const { fingerprintId, name, department } = body;
+        // Validate input
+        const validationResult = fingerprintRegistrationSchema.safeParse(body);
+        if (!validationResult.success) {
+            logger.warn(`Validation failed: ${JSON.stringify(validationResult.error.flatten())}`);
+            return c.json(
+                {
+                    error: "Validation failed",
+                    details: validationResult.error.flatten().fieldErrors,
+                },
+                400
+            );
+        }
+
+        const { fingerprintId, name, department } = validationResult.data;
 
         // Check if fingerprint already exists
         const existingFingerprint = await Fingerprint.findOne({ fingerprintId });
@@ -39,6 +57,17 @@ export const registerFingerprint = async (c: Context) => {
 
         await fingerprint.save();
         logger.info(`✅ Fingerprint registered: ID=${fingerprintId}, Name=${name}`);
+
+        // Create attendance log entry for registration event
+        const registrationLog = new AttendanceLog({
+            fingerprintId,
+            name,
+            department,
+            timestamp: new Date(),
+            eventType: "registration",
+        });
+
+        await registrationLog.save();
 
         // Publish MQTT event for real-time updates
         mqttService.publish("attendance/events", {
@@ -82,7 +111,20 @@ export const markFingerprintAttendance = async (c: Context) => {
         const body = await c.req.json();
         logger.info(`Body: ${JSON.stringify(body)}`);
 
-        const { fingerprintId } = body;
+        // Validate input
+        const validationResult = fingerprintAttendanceSchema.safeParse(body);
+        if (!validationResult.success) {
+            logger.warn(`Validation failed: ${JSON.stringify(validationResult.error.flatten())}`);
+            return c.json(
+                {
+                    error: "Validation failed",
+                    details: validationResult.error.flatten().fieldErrors,
+                },
+                400
+            );
+        }
+
+        const { fingerprintId } = validationResult.data;
 
         // Check if fingerprint is registered
         const fingerprint = await Fingerprint.findOne({
@@ -111,6 +153,17 @@ export const markFingerprintAttendance = async (c: Context) => {
 
         await attendanceRecord.save();
         logger.info(`✅ Attendance marked for ${fingerprint.name} (ID: ${fingerprintId})`);
+
+        // Create attendance log entry for tracking
+        const attendanceLog = new AttendanceLog({
+            fingerprintId: fingerprint.fingerprintId,
+            name: fingerprint.name,
+            department: fingerprint.department,
+            timestamp: new Date(),
+            eventType: "attendance",
+        });
+
+        await attendanceLog.save();
 
         // Note: MQTT event is already published by the firmware device
         // Server only creates the database record and responds to the HTTP request
@@ -195,8 +248,9 @@ export const getAllFingerprints = async (c: Context) => {
         return c.json(
             {
                 message: "Fingerprints retrieved successfully",
+                data: fingerprints,
                 count: fingerprints.length,
-                fingerprints,
+                total: fingerprints.length,
             },
             200
         );
@@ -264,8 +318,12 @@ export const getFingerprintAttendance = async (c: Context) => {
                 pagination: {
                     currentPage: pageNum,
                     totalPages: Math.ceil(total / limitNum),
+                    totalItems: total,
                     totalRecords: total,
+                    itemsPerPage: limitNum,
                     limit: limitNum,
+                    hasNextPage: pageNum < Math.ceil(total / limitNum),
+                    hasPrevPage: pageNum > 1,
                 },
             },
             200
@@ -443,6 +501,81 @@ export const getUserAttendanceReport = async (c: Context) => {
         return c.json(
             {
                 error: "Failed to generate user report",
+                details: error.message,
+            },
+            500
+        );
+    }
+};
+
+// New endpoint: Get attendance logs (real-time events)
+export const getAttendanceLogs = async (c: Context) => {
+    try {
+        const { startDate, endDate, department, eventType, page = "1", limit = "100" } = c.req.query();
+
+        // Build filter query
+        const filter: any = {};
+
+        // Date range filter
+        if (startDate || endDate) {
+            filter.timestamp = {};
+            if (startDate) {
+                filter.timestamp.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                const endDateTime = new Date(endDate);
+                endDateTime.setHours(23, 59, 59, 999); // Include full end date
+                filter.timestamp.$lte = endDateTime;
+            }
+        }
+
+        // Department filter
+        if (department) {
+            filter.department = department;
+        }
+
+        // Event type filter
+        if (eventType) {
+            filter.eventType = eventType;
+        }
+
+        // Pagination
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        const [logs, total] = await Promise.all([
+            AttendanceLog.find(filter)
+                .sort({ timestamp: -1 })
+                .skip(skip)
+                .limit(limitNum),
+            AttendanceLog.countDocuments(filter),
+        ]);
+
+        logger.info(`Retrieved ${logs.length} attendance logs (page ${page})`);
+
+        return c.json(
+            {
+                message: "Attendance logs retrieved successfully",
+                data: logs,
+                pagination: {
+                    currentPage: pageNum,
+                    totalPages: Math.ceil(total / limitNum),
+                    totalItems: total,
+                    totalRecords: total,
+                    itemsPerPage: limitNum,
+                    limit: limitNum,
+                    hasNextPage: pageNum < Math.ceil(total / limitNum),
+                    hasPrevPage: pageNum > 1,
+                },
+            },
+            200
+        );
+    } catch (error: any) {
+        logger.error(`Error retrieving attendance logs: ${error.message}`);
+        return c.json(
+            {
+                error: "Failed to retrieve attendance logs",
                 details: error.message,
             },
             500

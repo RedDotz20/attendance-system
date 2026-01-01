@@ -2,6 +2,10 @@
  * Fingerprint feature exports
  */
 
+// Pages
+import FingerprintsPage from "./pages/fingerprints-table";
+export { default as FingerprintsPage } from "./pages/fingerprints-table";
+
 // Services
 export { FingerprintService } from "./services/fingerprint.service";
 
@@ -39,3 +43,6 @@ export type {
 	FingerprintListFilters,
 	FingerprintAttendanceFilters,
 } from "@/types/fingerprint.type";
+
+// Default export
+export default FingerprintsPage;

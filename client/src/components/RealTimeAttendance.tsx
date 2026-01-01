@@ -1,10 +1,12 @@
 /**
- * Real-time Attendance Component
- * Connects to MQTT broker via WebSockets to display live attendance events
+ * Real-time Attendance Component with Persistent Logs
+ * Displays attendance events from database with live MQTT updates
  */
 
 import React, { useState, useEffect, useCallback } from "react";
 import mqtt from "mqtt";
+import { useQuery } from "@tanstack/react-query";
+import { FingerprintService } from "@/features/fingerprint/services/fingerprint.service";
 import {
 	Card,
 	CardContent,
@@ -15,15 +17,25 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle, RefreshCw } from "lucide-react";
 
-interface AttendanceEvent {
-	device_id: string;
-	fingerprint_id: number;
-	timestamp: number;
-	event_type: string;
-	user_name?: string;
-	department?: string;
+interface AttendanceLog {
+	_id: string;
+	fingerprintId: string;
+	name: string;
+	department: string;
+	timestamp: string;
+	eventType: "attendance" | "registration" | "device_status";
+	createdAt: string;
 }
 
 interface DeviceStatus {
@@ -39,7 +51,6 @@ interface MqttConnectionStatus {
 }
 
 export const RealTimeAttendance: React.FC = () => {
-	const [events, setEvents] = useState<AttendanceEvent[]>([]);
 	const [deviceStatuses, setDeviceStatuses] = useState<
 		Map<string, DeviceStatus>
 	>(new Map());
@@ -50,12 +61,43 @@ export const RealTimeAttendance: React.FC = () => {
 			error: undefined,
 		});
 	const [client, setClient] = useState<mqtt.MqttClient | null>(null);
+	const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
+	const [searchQuery, setSearchQuery] = useState<string>("");
 
 	// MQTT broker WebSocket URL - adjust according to your broker configuration
 	const MQTT_BROKER_WS_URL =
 		import.meta.env["VITE_MQTT_WS_URL"] || "ws://localhost:9001";
 	const MQTT_USERNAME = import.meta.env["VITE_MQTT_USERNAME"] || "";
 	const MQTT_PASSWORD = import.meta.env["VITE_MQTT_PASSWORD"] || "";
+
+	// Fetch attendance logs from database
+	const {
+		data: logsData,
+		isLoading: logsLoading,
+		refetch: refetchLogs,
+	} = useQuery({
+		queryKey: ["attendance-logs", selectedDepartment],
+		queryFn: () =>
+			FingerprintService.getAttendanceLogs({
+				department:
+					selectedDepartment !== "all" ? selectedDepartment : undefined,
+				eventType: "attendance",
+				limit: 200,
+			}),
+		staleTime: 5000,
+		refetchInterval: 10000,
+	});
+
+	const logs = logsData?.data || [];
+
+	// Filter logs based on search query
+	const filteredLogs = searchQuery
+		? logs.filter(
+				(log: AttendanceLog) =>
+					log.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+					log.fingerprintId.includes(searchQuery)
+		  )
+		: logs;
 
 	const connectToMQTT = useCallback(() => {
 		try {
@@ -67,7 +109,7 @@ export const RealTimeAttendance: React.FC = () => {
 
 			// Create MQTT client with WebSocket transport
 			const mqttOptions: mqtt.IClientOptions = {
-				clientId: `react-client-${Date.now()}`,
+				clientId: `react-realtime-${Date.now()}`,
 				clean: true,
 				connectTimeout: 10000,
 				protocol: MQTT_BROKER_WS_URL.startsWith("wss://") ? "wss" : "ws",
@@ -139,7 +181,8 @@ export const RealTimeAttendance: React.FC = () => {
 
 					switch (topic) {
 						case "attendance/events":
-							handleAttendanceEvent(data);
+							// Refetch logs when new event arrives
+							refetchLogs();
 							break;
 						case "attendance/device/status":
 							handleDeviceStatus(data);
@@ -162,39 +205,6 @@ export const RealTimeAttendance: React.FC = () => {
 			});
 		}
 	}, [MQTT_BROKER_WS_URL]);
-
-	const handleAttendanceEvent = useCallback((data: AttendanceEvent) => {
-		const event: AttendanceEvent = {
-			device_id: data.device_id,
-			fingerprint_id: data.fingerprint_id,
-			timestamp: data.timestamp,
-			event_type: data.event_type,
-			...(data.user_name && { user_name: data.user_name }),
-			...(data.department && { department: data.department }),
-		};
-
-		setEvents((prevEvents) => {
-			// Deduplication: Check if an identical event already exists within the last 5 seconds
-			// Matches on fingerprint_id, event_type, and timestamp window
-			const isDuplicate = prevEvents.some(
-				(existingEvent) =>
-					existingEvent.fingerprint_id === event.fingerprint_id &&
-					existingEvent.event_type === event.event_type &&
-					Math.abs(event.timestamp - existingEvent.timestamp) < 5000 // Within 5 seconds
-			);
-
-			if (isDuplicate) {
-				console.log(
-					`Duplicate attendance event for fingerprint ${event.fingerprint_id}, skipping...`
-				);
-				return prevEvents;
-			}
-
-			const newEvents = [event, ...prevEvents];
-			// Keep only the last 50 events to prevent memory issues
-			return newEvents.slice(0, 50);
-		});
-	}, []);
 
 	const handleDeviceStatus = useCallback((data: DeviceStatus) => {
 		const status: DeviceStatus = {
@@ -222,10 +232,6 @@ export const RealTimeAttendance: React.FC = () => {
 		}
 	}, [client]);
 
-	const clearEvents = useCallback(() => {
-		setEvents([]);
-	}, []);
-
 	useEffect(() => {
 		connectToMQTT();
 
@@ -237,13 +243,18 @@ export const RealTimeAttendance: React.FC = () => {
 		};
 	}, [connectToMQTT]);
 
-	const formatTimestamp = (timestamp: number) => {
+	const formatTimestamp = (timestamp: string) => {
 		return new Date(timestamp).toLocaleString();
 	};
 
 	const getStatusBadgeVariant = (status: string) => {
 		return status === "online" ? "default" : "destructive";
 	};
+
+	// Get unique departments from logs for filter
+	const departments = Array.from(
+		new Set(logs.map((log: AttendanceLog) => log.department))
+	);
 
 	return (
 		<div className="space-y-6">
@@ -311,7 +322,10 @@ export const RealTimeAttendance: React.FC = () => {
 									<div>
 										<span className="font-medium">{device.device_id}</span>
 										<p className="text-sm text-muted-foreground">
-											Last seen: {formatTimestamp(device.timestamp)}
+											Last seen:{" "}
+											{formatTimestamp(
+												new Date(device.timestamp).toISOString()
+											)}
 										</p>
 									</div>
 									<Badge variant={getStatusBadgeVariant(device.status)}>
@@ -324,79 +338,124 @@ export const RealTimeAttendance: React.FC = () => {
 				</CardContent>
 			</Card>
 
-			{/* Real-time Events */}
+			{/* Attendance Logs with Filters */}
 			<Card>
 				<CardHeader>
 					<CardTitle className="flex items-center justify-between">
-						<span>Real-time Attendance Events</span>
-						<div className="flex gap-2">
-							<Badge variant="outline">{events.length} events</Badge>
-							<Button
-								onClick={clearEvents}
-								variant="outline"
-								size="sm"
-							>
-								Clear
-							</Button>
-						</div>
+						<span>Attendance Logs</span>
+						<Button
+							onClick={() => refetchLogs()}
+							variant="outline"
+							size="sm"
+						>
+							<RefreshCw className="h-4 w-4 mr-2" />
+							Refresh
+						</Button>
 					</CardTitle>
 					<CardDescription>
-						Live attendance events from connected devices
+						Real-time attendance events from the system with persistent logs
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					{events.length === 0 ? (
-						<div className="text-center py-8">
+					{/* Filters */}
+					<div className="flex gap-4 mb-6">
+						<Input
+							placeholder="Search by name or fingerprint ID..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							className="flex-1"
+						/>
+						<Select
+							value={selectedDepartment}
+							onValueChange={setSelectedDepartment}
+						>
+							<SelectTrigger className="w-48">
+								<SelectValue placeholder="Filter by department" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All Departments</SelectItem>
+								{departments.map((dept) => (
+									<SelectItem
+										key={dept}
+										value={dept}
+									>
+										{dept}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+
+					{/* Logs Display */}
+					{logsLoading ? (
+						<div className="space-y-3">
+							{[...Array(5)].map((_, i) => (
+								<Skeleton
+									key={i}
+									className="h-20"
+								/>
+							))}
+						</div>
+					) : filteredLogs.length === 0 ? (
+						<div className="text-center py-12">
+							<AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
 							<p className="text-muted-foreground">
-								No attendance events received yet
-							</p>
-							<p className="text-sm text-muted-foreground mt-1">
-								Events will appear here when fingerprints are scanned on
-								connected devices
+								{logs.length === 0
+									? "No attendance logs yet"
+									: "No results matching your search"}
 							</p>
 						</div>
 					) : (
-						<div className="space-y-3 max-h-96 overflow-y-auto">
-							{events.map((event, index) => (
+						<div className="space-y-3 max-h-[600px] overflow-y-auto">
+							{filteredLogs.map((log: AttendanceLog) => (
 								<div
-									key={`${event.device_id}-${event.timestamp}-${index}`}
-									className="border rounded-lg p-3"
+									key={log._id}
+									className="border rounded-lg p-4 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition"
 								>
 									<div className="flex items-center justify-between mb-2">
-										<div className="flex items-center gap-2">
-											<Badge variant="outline">
-												Fingerprint ID: {event.fingerprint_id}
-											</Badge>
-											<Badge variant="secondary">{event.device_id}</Badge>
-										</div>
-										<span className="text-sm text-muted-foreground">
-											{formatTimestamp(event.timestamp)}
-										</span>
-									</div>
-
-									{(event.user_name || event.department) && (
-										<>
-											<Separator className="my-2" />
-											<div className="grid grid-cols-2 gap-2 text-sm">
-												{event.user_name && (
-													<div>
-														<span className="font-medium">Name: </span>
-														{event.user_name}
-													</div>
-												)}
-												{event.department && (
-													<div>
-														<span className="font-medium">Department: </span>
-														{event.department}
-													</div>
-												)}
+										<div className="flex items-center gap-3">
+											<div>
+												<h4 className="font-semibold text-base">{log.name}</h4>
+												<p className="text-xs text-muted-foreground">
+													{log.fingerprintId}
+												</p>
 											</div>
-										</>
-									)}
+										</div>
+										<div className="text-right">
+											<Badge
+												variant="outline"
+												className="capitalize mb-1"
+											>
+												{log.eventType}
+											</Badge>
+											<p className="text-xs text-muted-foreground">
+												{formatTimestamp(log.timestamp)}
+											</p>
+										</div>
+									</div>
+									<div className="flex gap-2">
+										<Badge
+											variant="secondary"
+											className="text-xs"
+										>
+											{log.department}
+										</Badge>
+										<Badge
+											variant="outline"
+											className="text-xs"
+										>
+											{new Date(log.createdAt).toLocaleDateString()}
+										</Badge>
+									</div>
 								</div>
 							))}
 						</div>
 					)}
+
+					{/* Summary */}
+					<div className="mt-4 pt-4 border-t text-sm text-muted-foreground">
+						Showing {filteredLogs.length} of {logs.length} total logs
+					</div>
 				</CardContent>
 			</Card>
 		</div>

@@ -52,3 +52,49 @@ export interface FingerprintAttendanceFilters {
 	page?: number;
 	limit?: number;
 }
+
+export interface FingerprintListResponse {
+	message: string;
+	data: Fingerprint[];
+	count: number;
+	total: number;
+}
+
+export interface AttendanceLogFilters {
+	department?: string;
+	eventType?: string;
+	startDate?: string;
+	endDate?: string;
+	page?: number;
+	limit?: number;
+}
+
+/**
+ * Represents an attendance log entry from the server
+ */
+export interface AttendanceLog {
+	_id: string;
+	fingerprintId: string;
+	name: string;
+	department: string;
+	timestamp: string;
+	eventType: "attendance" | "registration" | "device_status";
+	deviceId?: string;
+	metadata?: Record<string, unknown>;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/**
+ * Fingerprint with optional _id field from MongoDB
+ */
+export interface FingerprintWithId extends Fingerprint {
+	_id?: string;
+}
+
+/**
+ * Fingerprint attendance with optional _id field from MongoDB
+ */
+export interface FingerprintAttendanceWithId extends FingerprintAttendance {
+	_id?: string;
+}

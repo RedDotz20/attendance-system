@@ -7,6 +7,7 @@ import {
 	getFingerprintAttendance,
 	getAttendanceStats,
 	getUserAttendanceReport,
+	getAttendanceLogs,
 } from "../controller/fingerprint.controller.js";
 import {
 	setDeviceMode,
@@ -48,6 +49,7 @@ fingerprint.get("/fingerprints", apiKeyAuth, getAllFingerprints);
 // Attendance management endpoints
 fingerprint.get("/attendance", apiKeyAuth, getFingerprintAttendance); // With filters & pagination
 fingerprint.get("/attendance/stats", apiKeyAuth, getAttendanceStats); // Statistics & analytics
+fingerprint.get("/logs", apiKeyAuth, getAttendanceLogs); // Real-time event logs
 fingerprint.get("/attendance/user/:id", apiKeyAuth, getUserAttendanceReport); // User-specific report
 
 // Device control endpoints - require API key in header
