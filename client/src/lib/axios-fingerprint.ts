@@ -5,7 +5,7 @@ import axios from "axios";
  * This is separate from the main axios instance which is used for auth endpoints
  */
 const apiFP = axios.create({
-	baseURL: import.meta.env["VITE_API_URL"] || "http://localhost:3000",
+	baseURL: import.meta.env.DEV ? "/api" : import.meta.env["VITE_API_URL"] || "http://localhost:3000",
 	headers: {
 		"Content-Type": "application/json",
 		// Include API secret key for fingerprint endpoints

@@ -5,7 +5,7 @@ import axios from "axios";
  * Separate from main axios to include API key for signup endpoint
  */
 const apiAuth = axios.create({
-	baseURL: import.meta.env["VITE_API_URL"] || "http://localhost:3000",
+	baseURL: import.meta.env.DEV ? "/api" : import.meta.env["VITE_API_URL"] || "http://localhost:3000",
 	headers: {
 		"Content-Type": "application/json",
 		// Include API key for registration endpoint

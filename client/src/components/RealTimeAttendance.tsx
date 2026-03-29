@@ -79,8 +79,7 @@ export const RealTimeAttendance: React.FC = () => {
 		queryKey: ["attendance-logs", selectedDepartment],
 		queryFn: () =>
 			FingerprintService.getAttendanceLogs({
-				department:
-					selectedDepartment !== "all" ? selectedDepartment : undefined,
+				...(selectedDepartment !== "all" && { department: selectedDepartment }),
 				eventType: "attendance",
 				limit: 200,
 			}),
